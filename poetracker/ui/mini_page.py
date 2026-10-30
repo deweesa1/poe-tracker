@@ -17,16 +17,16 @@ MINI_CSS = """
 html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
 .nicegui-content { padding: 0 !important; }
 .q-page, .q-layout, .q-page-container { background: transparent !important; min-height: 0 !important; }
-.mini { box-sizing: border-box; width: 100vw; height: 100vh; padding: 10px 12px; overflow: hidden;
+.mini { box-sizing: border-box; width: 100vw; height: 100vh; padding: 10px 12px 24px; overflow: hidden;
   font-family: "Segoe UI", system-ui, sans-serif; color: var(--ex-text);
   background: linear-gradient(180deg, var(--ex-panel) 0%, var(--ex-panel-2) 100%);
   border: 1px solid var(--ex-line); box-shadow: inset 0 0 0 1px #000, inset 0 0 0 2px var(--ex-a10); }
 .mini.unlocked { border-color: var(--ex-gold); }
 .m-top { display: flex; align-items: center; gap: 6px; font-family: 'Cinzel', serif; font-weight: 600; font-size: 11px;
   letter-spacing: .05em; color: var(--ex-muted); white-space: nowrap; overflow: hidden; }
-.m-top .lg { color: var(--ex-gold-hi); overflow: hidden; text-overflow: ellipsis; min-width: 40px; flex: 0 1 auto; }
-.m-top .ch { flex: 0 0 auto; }
-.m-top .sp { flex: 1; }
+.m-top .m-lg { color: var(--ex-gold-hi); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.m-top .ch { flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.m-top .sp { flex: 1 1 0; min-width: 0; }
 .m-btn { cursor: pointer; color: var(--ex-muted); font-size: 13px; padding: 0 3px; display: none; }
 .m-btn:hover { color: var(--ex-gold-hi); }
 .mini.unlocked .m-btn { display: inline; }
@@ -48,6 +48,10 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-bar div i { position: absolute; inset: 0; background: var(--ex-gold); }
 .m-bar div i.cur { background: var(--ex-cur); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
+.m-foot { position: fixed; left: 12px; right: 12px; bottom: 6px; font-size: 10.5px; color: var(--ex-dim);
+  display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
+.m-foot .when-unlocked { display: none; color: var(--ex-gold); }
+.mini.unlocked .m-foot .when-unlocked { display: inline; } .mini.unlocked .m-foot .when-locked { display: none; }
 """
 
 TICK_JS = """
@@ -86,15 +90,15 @@ def _ticker(base, anchor, on, cls="") -> str:
 
 
 def render(d: dict, live: bool) -> str:
-    top_buttons = ('<span class="m-btn" title="Lock (Ctrl+Shift+F9): clicks pass through to the game" '
+    top_buttons = ('<span class="m-btn" title="Lock: clicks pass through to the game" '
                    'onclick="ptApi(\'toggle_lock\')">🔒</span>'
                    '<span class="m-btn" title="Close the mini tracker" onclick="ptApi(\'close\')">✕</span>')
     if not d.get("league"):
-        return f'<div class="m-top"><span class="lg">PoE Tracker</span><span class="sp"></span>{top_buttons}</div>' \
+        return f'<div class="m-top"><span class="m-lg">PoE Tracker</span><span class="sp"></span>{top_buttons}</div>' \
                f'<div class="m-dim">No league has started yet.</div>'
     if d.get("view") == "campaign":
         c = d.get("campaign")
-        head = (f'<div class="m-top"><span class="lg">{_esc(d["league"])}</span>'
+        head = (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span>'
                 f'<span class="ch">· {_esc(c["character"]) if c else "campaign"}</span><span class="sp"></span>{top_buttons}</div>')
         if not c:
             return head + '<div class="m-dim">Waiting for your first character. The timer starts in The Twilight Strand.</div>'
@@ -133,7 +137,7 @@ def render(d: dict, live: bool) -> str:
     nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
                   f'{_esc(x["group"].replace(" Voidstone", ""))}</span>{_esc(x["name"])}</div>' for x in m.get("next", []))
     phase = "Mapping" if d.get("phase") == "mapping" else "Endgame"
-    return (f'<div class="m-top"><span class="lg">{_esc(d["league"])}</span><span class="ch">· {_esc(m.get("character") or "")}</span>'
+    return (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span><span class="ch">· {_esc(m.get("character") or "")}</span>'
             f'<span class="sp"></span>{top_buttons}</div>'
             f'<div class="m-clock">{m.get("voidstones", 0)}<span style="font-size:18px;color:var(--ex-muted)">/{m.get("voidstones_total", 4)}</span>'
             f'<span class="pct">Voidstones</span></div>'
@@ -151,12 +155,16 @@ def mini_page():
     ui.add_body_html(TICK_JS)
     ui.query("body").style("background: transparent")
     box = ui.html("", sanitize=False).classes("mini")
+    from .. import mini as mini_mod
+    hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
+    foot = (f'<div class="m-foot"><span class="when-locked">🔒 {hk} to unlock</span>'
+            f'<span class="when-unlocked">Drag to move · {hk} to lock</span></div>')
     last = {"json": None}
 
     def refresh():
         if busy():
             data = {"busy": True}
-            html = '<div class="m-top"><span class="lg">PoE Tracker</span></div><div class="m-dim">Reading your log…</div>'
+            html = '<div class="m-top"><span class="m-lg">PoE Tracker</span></div><div class="m-dim">Reading your log…</div>'
         else:
             data = STATE.cached(("mini",), lambda c: metrics.mini_status(c, STATE.cfg))
             st = STATE.tracker.status() if STATE.tracker else {}
@@ -169,7 +177,7 @@ def mini_page():
         j = json.dumps([html])
         if j != last["json"]:
             last["json"] = j
-            box.set_content(html)
+            box.set_content(html + foot)
             ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false)")
     refresh()
     ui.timer(3, refresh)

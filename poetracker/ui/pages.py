@@ -1413,9 +1413,11 @@ def settings_page():
             ui.label("A small always-on-top window with your live campaign timer, splits, next boss and trial "
                      "(or Voidstones and next milestones while mapping). Use the game in windowed or borderless "
                      "fullscreen so it can sit over it.").classes("pt-sub")
-            hk = s.get("mini_hotkey", "ctrl+shift+f9")
+            from .. import mini as mini_mod
+            hk = s.get("mini_hotkey", mini_mod.DEFAULT_HOTKEY)
             ui.label(f"Locked: clicks pass straight through to the game and it never takes focus. Unlocked: drag it, "
-                     f"resize it from the edges, or close it. Switch with {hk.upper().replace('+', ' + ')}.").classes("pt-note")
+                     f"resize it from the edges, or close it. Switch with {mini_mod.hotkey_label(s)}. The default "
+                     f"(Ctrl+Shift+F11) isn't used by Path of Exile or Awakened PoE Trade.").classes("pt-note")
 
             def open_mini():
                 from .. import mini as mini_mod
@@ -1425,7 +1427,7 @@ def settings_page():
             def save_mini():
                 from .. import mini as mini_mod
                 if not mini_mod.parse_hotkey(hk_in.value or ""):
-                    ui.notify("Hotkey like ctrl+shift+f9 (ctrl/alt/shift/win + a letter, number or F1-F12).", type="warning")
+                    ui.notify("Hotkey like ctrl+shift+f11 (ctrl/alt/shift/win + a letter, number or F1-F12).", type="warning")
                     return
                 config_mod.save_settings({"mini_on_start": bool(on_start.value), "mini_opacity": round(op.value / 100, 2),
                                           "mini_hotkey": (hk_in.value or "").strip().lower()})

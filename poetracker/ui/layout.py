@@ -189,6 +189,12 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     with ui.item_section().props("avatar").style("min-width:34px"):
                         ui.icon(icon, size="20px")
                     ui.item_section(label).style("white-space:nowrap")
+        from .. import mini as mini_mod
+        with ui.column().classes("q-px-md q-pt-md gap-1 w-full"):
+            ui.button("Mini Tracker", icon="picture_in_picture_alt", on_click=open_mini).props(
+                "outline no-caps").classes("w-full pt-mini-btn").tooltip("A small always-on-top window for live tracking")
+            ui.label(f"{mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)} locks / unlocks it").classes(
+                "pt-note").style("font-size:11px;text-align:center;width:100%")
         if ls["phase"] in PHASE_PAGE:
             text = ("Campaign · finish Act 10 to open League Start Mapping" if ls["phase"] == "campaign" else
                     f"Mapping · {ls['voidstones']} of {ls['voidstones_total']} Voidstones. All four open the other dashboards")
@@ -220,10 +226,6 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                 lbl = ui.label(text)
                 if tip:
                     lbl.tooltip(tip)
-                def open_mini():
-                    from .. import mini as mini_mod
-                    mini_mod.launch_mini()
-                    ui.notify("Opening the mini tracker… Ctrl+Shift+F9 locks it (clicks pass through to the game).")
                 ui.button(icon="picture_in_picture_alt", on_click=open_mini).props(
                     "flat round dense size=sm").tooltip("Open the mini tracker (always on top)")
                 up = STATE.updater.state if STATE.updater else {}
@@ -239,6 +241,14 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
         ui.timer(5, draw_status)
 
     return ui.column().classes("w-full q-pa-lg gap-4").style("max-width:1500px")
+
+
+def open_mini() -> None:
+    from .. import mini as mini_mod
+    mini_mod.launch_mini()
+    hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
+    ui.notify(f"Opening the mini tracker… Drag it into place, then press {hk} to lock it "
+              f"(clicks pass through to the game). {hk} again unlocks it.", timeout=8000)
 
 
 def update_dialog() -> None:

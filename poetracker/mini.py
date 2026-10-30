@@ -4,7 +4,8 @@ mini button does this).
 
 Locked (default while playing): clicks pass through to the game and the
 window never takes focus. Unlocked: drag it, resize it, use its buttons.
-Toggle with the hotkey (Ctrl+Shift+F9 by default, mini_hotkey in settings.yaml).
+Toggle with the hotkey (Ctrl+Shift+F11 by default, mini_hotkey in settings.yaml). It's picked so it
+clashes with neither Path of Exile's default keys nor Awakened PoE Trade's (which uses F5 and F9).
 """
 from __future__ import annotations
 
@@ -19,6 +20,14 @@ from . import config as config_mod, paths
 
 log = logging.getLogger(__name__)
 TITLE = "PoE Tracker - Mini"
+DEFAULT_HOTKEY = "ctrl+shift+f11"
+
+
+def hotkey_label(settings: dict | None) -> str:
+    """'ctrl+shift+f11' -> 'Ctrl+Shift+F11' for display."""
+    text = (settings or {}).get("mini_hotkey") or DEFAULT_HOTKEY
+    return "+".join(p.upper() if p.startswith("f") and p[1:].isdigit() else p.capitalize()
+                    for p in text.replace(" ", "").split("+"))
 PORT_FILE = "ui_port.txt"
 
 
@@ -186,7 +195,7 @@ def run_mini() -> int:
             hwnd_box["h"] = win32.find(TITLE)
         time.sleep(1.0)                # let the page load before telling it the lock state
         apply()
-        hk = parse_hotkey(s.get("mini_hotkey", "ctrl+shift+f9"))
+        hk = parse_hotkey(s.get("mini_hotkey", DEFAULT_HOTKEY))
         if win32 and hk:
             def toggle():
                 state["locked"] = not state["locked"]
