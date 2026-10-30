@@ -1549,7 +1549,8 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
             "level": sp["level_end"], "deaths": sp["deaths"], "progress": sp["progress"],
             "splits": [{"act": a["act"], "split": a["split"], "time_s": a["time_s"]} for a in done],
             "act_progress": cur["progress"] if cur else 1.0,
-            "labs": [{"lab": l["lab"].split()[0], "split": l["split"], "done": bool(l["split"] is not None)}
+            "labs": [{"lab": l["lab"].split()[0], "split": l["split"], "done": bool(l["split"] is not None),
+                      "time_s": l["time_s"]}
                      for l in sp["labs"]],
             "next_boss": {"boss": nxt_boss["boss"], "act": nxt_boss["act"],
                           "zone": next((z for (_, b_, z, _p) in CAMPAIGN_BOSSES if b_ == nxt_boss["boss"]), None)}

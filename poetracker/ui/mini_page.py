@@ -39,10 +39,9 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
   margin: 9px 0 3px; border-bottom: 1px solid var(--ex-line-dim); padding-bottom: 2px; }
 .m-splits { display: flex; flex-direction: column; }
 .m-split { display: flex; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.55; white-space: nowrap; }
-.m-split .a { width: 30px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
+.m-split .a { width: 58px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
 .m-split.cur .a, .m-split.cur .t { color: var(--ex-gold-hi); } .m-split.todo { color: var(--ex-dim); }
-.m-labs { display: flex; gap: 10px; font-size: 12px; margin-top: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.m-labs span { color: var(--ex-muted); } .m-labs b { color: var(--ex-text); font-weight: 600; }
+
 .m-where .pct { color: var(--ex-gold); font-weight: 600; margin-left: 6px; }
 .m-btns { position: fixed; top: 7px; right: 8px; display: flex; gap: 2px; z-index: 5; }
 .m-btns span { cursor: pointer; color: var(--ex-muted); font-size: 13px; padding: 1px 4px; border-radius: 3px; }
@@ -101,7 +100,7 @@ TICK_JS = """
     window.ptCollapsed = c;
     document.querySelectorAll('.mini').forEach(el => el.classList.toggle('collapsed', c));
     const b = document.querySelector('.m-btns .c');
-    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show splits' : 'Only the timer and act bar'; }
+    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show acts and labs' : 'Only the timer and act bar'; }
     window.ptFit();
   };
   window.ptToggleCollapse = function () {
@@ -213,8 +212,11 @@ def render(d: dict, live: bool) -> str:
                         f'<span class="d">{_ticker(c["act_s"], c["anchor_utc"], on) if c["act_s"] is not None else ""}</span></div>')
             return f'<div class="m-split todo"><span class="a">A{a}</span><span class="t">–</span></div>'
         splits = '<div class="m-splits">' + "".join(cell(a) for a in range(1, 11)) + '</div>'
-        labs = "".join(f'<span>{_esc(l["lab"])} <b>{fmt.clock(l["split"]) if l["done"] else "–"}</b></span>'
-                       for l in c.get("labs") or [])
+        labs = "".join(
+            (f'<div class="m-split"><span class="a">{_esc(l["lab"])}</span><span class="t">{fmt.clock(l["split"])}</span>'
+             f'<span class="d">{fmt.dur(l["time_s"], True) if l.get("time_s") else ""}</span></div>') if l["done"] else
+            f'<div class="m-split todo"><span class="a">{_esc(l["lab"])}</span><span class="t">–</span></div>'
+            for l in c.get("labs") or [])
         nb, nt = c.get("next_boss"), c.get("next_trial")
         nxt = ""
         if nb:
@@ -228,8 +230,8 @@ def render(d: dict, live: bool) -> str:
                 + f'<div class="m-row"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
                   f'<span>Quest pts <b>{c["quest_points"]}/{c["quest_total"]}</b></span></div>'
                 + bar
-                + f'<div class="m-hide"><div class="m-h">SPLITS</div>{splits}'
-                + (f'<div class="m-labs"><span style="color:var(--ex-gold)">LABS</span>{labs}</div>' if labs else "")
+                + f'<div class="m-hide"><div class="m-h">ACTS</div>{splits}'
+                + (f'<div class="m-h">LABYRINTHS</div><div class="m-splits">{labs}</div>' if labs else "")
                 + '</div>'
                 + (f'<div class="m-hide"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else ""))
     m = d.get("mapping") or {}
