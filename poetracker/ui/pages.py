@@ -1579,6 +1579,31 @@ def settings_page():
                     with ui.row().classes("w-full no-wrap gap-2"):
                         ui.label(k).classes("pt-note").style("min-width:150px")
                         ui.label(v).classes("text-sm").style("word-break:break-all")
+        from .layout import dev_mode
+        if dev_mode():
+            with card("Developer"):
+                ui.label("Force League Start to any league and phase, to test the League Start pages, the menu "
+                         "locking and the mini tracker without waiting for a league launch. Only shown when the "
+                         "tracker is started with Start PoE Tracker (dev).bat (or dev_mode: true in settings.yaml). "
+                         "Your data isn't changed.").classes("pt-sub")
+                d = dict(STATE.pref("dev_league_start") or {})
+                lgs = {"": "Automatic (newest league)", **{n: n for n in STATE.league_names()}}
+                phases = {"": "Automatic (from your data)", "campaign": "Campaign", "mapping": "Mapping",
+                          "done": "Finished (everything open)"}
+
+                def set_dev(key, value):
+                    cur = dict(STATE.pref("dev_league_start") or {})
+                    cur[key] = value or None
+                    STATE.set_pref("dev_league_start", cur if cur.get("league") else {})
+                    _reload()
+                with ui.row().classes("items-center gap-3 q-mt-sm"):
+                    ui.select(lgs, value=d.get("league") or "", label="League",
+                              on_change=lambda e: set_dev("league", e.value)).props("dense outlined dark").style("min-width:240px")
+                    ui.select(phases, value=d.get("phase") or "", label="Phase",
+                              on_change=lambda e: set_dev("phase", e.value)).props("dense outlined dark").style("min-width:220px")
+                note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
+                     "shows. The pages keep working out their own numbers, so a finished league still shows where its "
+                     "league start ended. Set League back to Automatic to stop forcing.")
         with card("League Start"):
             ls = league_start()
             phase = ls.get("real_phase") or ls.get("phase")

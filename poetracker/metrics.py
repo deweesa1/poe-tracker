@@ -1510,10 +1510,13 @@ def map_checklist(con, league: str, manual: dict | None = None, until: str | Non
 
 # ---------------------------------------------------------------- mini window
 
-def mini_status(con, config: Config, league: str | None = None) -> dict:
+def mini_status(con, config: Config, league: str | None = None, force_phase: str | None = None) -> dict:
     """Everything the always-on-top mini window shows, for the league being
-    started (campaign or mapping phase) or the latest league."""
+    started (campaign or mapping phase) or the latest league. force_phase
+    (developer mode) shows the campaign or mapping view whatever the data says."""
     status = league_start_status(con, config, league)
+    if force_phase in ("campaign", "mapping", "done"):
+        status = {**status, "phase": force_phase}
     lg = status["league"]
     out: dict = {"league": lg, "phase": status["phase"], "voidstones": status.get("voidstones"),
                  "voidstones_total": status.get("voidstones_total", 4)}

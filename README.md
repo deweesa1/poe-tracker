@@ -13,6 +13,8 @@ It never touches the game. It only reads the log file and, if you turn it on, th
 
 If something goes wrong, use **`Start PoE Tracker (with log window).bat`** to see the messages.
 
+**Developer mode:** **`Start PoE Tracker (dev).bat`** adds a *Developer* card to Settings that forces League Start to any league and phase (campaign, mapping, finished), for testing the League Start pages, menu locking and mini tracker. Your data isn't changed.
+
 ### Make an .exe
 
 Double-click **`Build exe.bat`** (after the first start). It creates `dist\PoE Tracker\PoE Tracker.exe`. You can move that folder anywhere and pin the exe to the taskbar. The exe isn't digitally signed, so Windows SmartScreen will warn the first time: click *More info → Run anyway*.

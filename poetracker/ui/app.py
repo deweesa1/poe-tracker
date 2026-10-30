@@ -12,8 +12,9 @@ from .layout import STATE
 log = logging.getLogger(__name__)
 
 
-def run(window: str | None = None, port: int | None = None) -> None:
+def run(window: str | None = None, port: int | None = None, dev: bool = False) -> None:
     service.setup_logging()
+    STATE.dev = dev
     if not service.single_instance():
         log.warning("PoE Tracker is already running; not starting a second copy")
         msg = ("PoE Tracker is already running.\n\nIf you can't see its window, end the leftover "

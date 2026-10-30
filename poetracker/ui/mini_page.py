@@ -109,7 +109,7 @@ def render(d: dict, live: bool) -> str:
         where = "Campaign complete" if c["completed"] else f'Act {c["act"]} · {_esc(c["zone"] or "")}'
         act_t = (_ticker(c["act_s"], c["anchor_utc"], on) if c["act_s"] is not None else "–")
         bar = "".join(
-            f'<div><i style="width:{100 if a <= len(c["splits"]) else 0}%"></i></div>' for a in range(1, 11))
+            f'<div><i style="width:{100 if c["completed"] or a < (c["act"] or 0) else 0}%"></i></div>' for a in range(1, 11))
         if not c["completed"] and c["act"]:
             done = {s["act"] for s in c["splits"]}
             bar = "".join(f'<div><i style="width:{100 if a in done or a < c["act"] else (c["progress"] * 10 - (a - 1)) * 100 if a == c["act"] else 0:.0f}%" '
@@ -179,7 +179,11 @@ def mini_page():
             data = {"busy": True}
             html = '<div class="m-top"><span class="m-lg">PoE Tracker</span></div><div class="m-dim">Reading your log…</div>'
         else:
-            data = STATE.cached(("mini",), lambda c: metrics.mini_status(c, STATE.cfg))
+            from .layout import dev_override
+            dev = dev_override() or {}
+            data = STATE.cached(("mini", dev.get("league"), dev.get("phase")),
+                                lambda c: metrics.mini_status(c, STATE.cfg, dev.get("league"), dev.get("phase")),
+                                league=dev.get("league"))
             st = STATE.tracker.status() if STATE.tracker else {}
             from datetime import datetime, timezone
             age = None

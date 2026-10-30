@@ -26,6 +26,7 @@ def main(argv=None) -> int:
     r.add_argument("--browser", action="store_true", help="open in the web browser instead of its own window")
     r.add_argument("--headless", action="store_true", help="don't open anything (for testing)")
     r.add_argument("--port", type=int)
+    r.add_argument("--dev", action="store_true", help="developer mode: force League Start to any league and phase")
     sub.add_parser("mini", help="open the always-on-top mini tracker (the tracker must be running)")
     sub.add_parser("restart", help="(used by updates) wait for the tracker to close, then start it again")
     sub.add_parser("ingest")
@@ -47,7 +48,7 @@ def main(argv=None) -> int:
     if args.cmd in (None, "run"):
         from .ui.app import run
         window = "headless" if getattr(args, "headless", False) else ("browser" if getattr(args, "browser", False) else None)
-        run(window=window, port=getattr(args, "port", None))
+        run(window=window, port=getattr(args, "port", None), dev=getattr(args, "dev", False))
         return 0
 
     service.setup_logging()

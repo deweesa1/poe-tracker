@@ -33,6 +33,7 @@ class State:
         self.cfg: config_mod.Config | None = None
         self.tracker = None
         self.updater = None
+        self.dev = False
         self._prefs: dict = {}
         self._lock = threading.Lock()
         self._cache: dict = {}
@@ -137,13 +138,37 @@ def league_start() -> dict:
     the per-league unlock in Settings."""
     if not STATE.cfg or not STATE.cfg.settings.get("league_start_mode", True):
         return {"phase": "done", "off": True}
+    dev = dev_override()
     try:
+        if dev:
+            st = STATE.cached(("league_start", dev["league"]),
+                              lambda c: metrics.league_start_status(c, STATE.cfg, dev["league"]), league=dev["league"])
+            if dev.get("phase") in ("campaign", "mapping", "done"):
+                st = {**st, "real_phase": st["phase"], "phase": dev["phase"]}
+            return {**st, "dev": True}
         st = STATE.cached(("league_start",), lambda c: metrics.league_start_status(c, STATE.cfg))
     except Exception:
         return {"phase": "done"}
     if st.get("league") and STATE.pref("ls_unlocked") == st["league"] and st["phase"] != "done":
         return {**st, "real_phase": st["phase"], "phase": "done", "unlocked": True}
     return st
+
+
+def dev_mode() -> bool:
+    """Developer mode: started with --dev (Start PoE Tracker (dev).bat) or
+    dev_mode: true in settings.yaml."""
+    return bool(STATE.dev or (STATE.cfg and STATE.cfg.settings.get("dev_mode")))
+
+
+def dev_override() -> dict | None:
+    """In developer mode: the league and phase League Start is forced to
+    (Settings → Developer), or None when it's left automatic."""
+    if not dev_mode():
+        return None
+    d = STATE.pref("dev_league_start") or {}
+    if not d.get("league") or d["league"] not in STATE.league_names():
+        return None
+    return d
 
 
 def is_open(path: str) -> bool:
@@ -233,6 +258,11 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             color, text, tip = status_text()
             status.clear()
             with status:
+                if dev_mode():
+                    d = dev_override()
+                    ui.badge("DEV" + (f" · {d['league']} · {d.get('phase') or 'auto'}" if d else ""),
+                             color="deep-orange").props("outline").tooltip(
+                        "Developer mode. League Start can be forced in Settings → Developer.")
                 ui.icon("circle", size="10px", color=color)
                 lbl = ui.label(text)
                 if tip:
