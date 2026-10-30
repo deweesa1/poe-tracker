@@ -17,7 +17,7 @@ MINI_CSS = """
 html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
 .nicegui-content { padding: 0 !important; }
 .q-page, .q-layout, .q-page-container { background: transparent !important; min-height: 0 !important; }
-.mini { box-sizing: border-box; width: 100vw; height: 100vh; padding: 10px 12px 6px; overflow: hidden;
+.mini { box-sizing: border-box; width: 100vw; min-height: 0; padding: 10px 12px 6px; overflow: hidden;
   display: flex; flex-direction: column;
   font-family: "Segoe UI", system-ui, sans-serif; color: var(--ex-text);
   background: linear-gradient(180deg, var(--ex-panel) 0%, var(--ex-panel-2) 100%);
@@ -49,7 +49,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-btns span:hover { color: var(--ex-gold-hi); background: var(--ex-a10); }
 .m-btns .x { display: none; } .mini.unlocked .m-btns .x { display: inline; }
 .m-top { padding-right: 64px; }
-.mini.collapsed .m-hide, .mini.collapsed .m-foot, .mini.collapsed .m-grip { display: none !important; }
+.mini.collapsed .m-hide, .mini.collapsed .m-foot { display: none !important; }
+.mini.collapsed { padding-bottom: 10px; }
 .mini.collapsed .m-row { margin-bottom: 0; }
 .m-next { font-size: 12.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-next .k { color: var(--ex-muted); display: inline-block; width: 44px; }
@@ -62,13 +63,13 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-bar div i.cur { background: var(--ex-cur); }
 .m-bar div i.skip { background: var(--ex-line); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
-.m-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.m-body { flex: 0 0 auto; }
 .m-foot { flex: 0 0 auto; padding-top: 4px; font-size: 10.5px; color: var(--ex-dim);
   display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
-.m-cut { display: none !important; }
+
 .m-foot .when-unlocked { display: none; color: var(--ex-gold); }
 .mini.unlocked .m-foot .when-unlocked { display: inline; }
-.m-grip { display: none; position: fixed; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize;
+.m-grip { display: none; position: fixed; right: 0; bottom: 0; width: 18px; height: 18px; cursor: ew-resize;
   background: linear-gradient(135deg, transparent 0 50%, var(--ex-gold) 50% 58%, transparent 58% 70%,
   var(--ex-gold) 70% 78%, transparent 78%); opacity: .8; }
 .mini.unlocked .m-grip { display: block; } .mini.unlocked .m-foot .when-locked { display: none; }
@@ -100,55 +101,55 @@ TICK_JS = """
     window.ptCollapsed = c;
     document.querySelectorAll('.mini').forEach(el => el.classList.toggle('collapsed', c));
     const b = document.querySelector('.m-btns .c');
-    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show splits' : 'Only the timer and bar'; }
-    if (!c) window.ptFit && window.ptFit();
+    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show splits' : 'Only the timer and act bar'; }
+    window.ptFit();
   };
   window.ptToggleCollapse = function () {
     const c = !window.ptCollapsed;
     window.ptSetCollapsed(c);
-    // tell the window how tall the collapsed view is, so it can shrink to it
-    const body = document.querySelector('.m-body');
-    const need = body ? Math.ceil(body.scrollHeight + 18) : 0;
-    ptApi('set_collapsed', c, need);
+    ptApi('set_collapsed', c);
   };
   window.ptToggleLock = function () { ptApi('set_lock', !(window.ptLocked !== false)); };
   // locked: it stays where it is (no dragging), buttons still work
   document.addEventListener('mousedown', (e) => {
     if (window.ptLocked !== false && !e.target.closest('.m-btns')) e.stopPropagation();
   }, true);
-  // Small window: drop whole sections from the bottom (highest data-p first)
-  // instead of cutting text in half.
+  window.ptApi = function (name, ...args) {
+    try { return window.pywebview.api[name](...args); } catch (e) { return null; }
+  };
+  // The window's height always matches what's shown (collapsed or not); you
+  // only choose the width. Sizes go to Python as page pixels plus the page's
+  // current size, so display scaling (125%, 150%) doesn't matter.
+  let fitT = null;
   window.ptFit = function () {
-    const body = document.querySelector('.m-body');
-    if (!body) return;
-    const opts = Array.from(body.querySelectorAll('[data-p]'));
-    opts.forEach(el => el.classList.remove('m-cut'));
-    opts.sort((a, b) => b.dataset.p - a.dataset.p);
-    for (const el of opts) {
-      if (window.ptCollapsed || body.scrollHeight <= body.clientHeight + 1) break;
-      el.classList.add('m-cut');
-    }
+    clearTimeout(fitT);
+    fitT = setTimeout(() => {
+      const m = document.querySelector('.mini');
+      if (!m) return;
+      const need = Math.ceil(m.getBoundingClientRect().bottom);
+      if (Math.abs(need - window.innerHeight) > 2) ptApi('fit', 0, need, window.innerWidth, window.innerHeight);
+    }, 60);
   };
   window.addEventListener('resize', () => window.ptFit());
-  window.ptApi = function (name, ...args) { try { window.pywebview.api[name](...args); } catch (e) {} };
-  // corner grip: frameless windows have no border to resize from
+  window.addEventListener('pywebviewready', () => window.ptFit());
+  // corner grip: drag sideways to change the width
   let rs = null, rsT = 0;
   document.addEventListener('pointerdown', (e) => {
     const g = e.target.closest('.m-grip');
     if (!g || window.ptLocked !== false) return;
     e.preventDefault(); e.stopPropagation();
     g.setPointerCapture(e.pointerId);
-    rs = {x: e.screenX, y: e.screenY, w: window.innerWidth, h: window.innerHeight, g: g};
+    rs = {x: e.screenX, w: window.innerWidth};
   }, true);
+  const rsTo = (e) => ptApi('fit', Math.max(220, rs.w + e.screenX - rs.x), 0, window.innerWidth, window.innerHeight);
   document.addEventListener('pointermove', (e) => {
     if (!rs) return;
     const now = Date.now();
-    if (now - rsT < 30) return;
+    if (now - rsT < 40) return;
     rsT = now;
-    ptApi('resize', rs.w + e.screenX - rs.x, rs.h + e.screenY - rs.y);
+    rsTo(e);
   }, true);
-  const rsEnd = (e) => { if (rs) { ptApi('resize', rs.w + e.screenX - rs.x, rs.h + e.screenY - rs.y); rs = null; } };
-  document.addEventListener('pointerup', rsEnd, true);
+  document.addEventListener('pointerup', (e) => { if (rs) { rsTo(e); rs = null; } }, true);
   document.addEventListener('pointercancel', () => { rs = null; }, true);
 })();
 </script>
@@ -224,13 +225,13 @@ def render(d: dict, live: bool) -> str:
         return (head
                 + f'<div class="m-clock">{_ticker(c["play_s"], c["anchor_utc"], on)}</div>'
                 + f'<div class="m-where">{where}</div>'
-                + f'<div class="m-row" data-p="4"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
+                + f'<div class="m-row"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
                   f'<span>Quest pts <b>{c["quest_points"]}/{c["quest_total"]}</b></span></div>'
                 + bar
-                + f'<div class="m-hide" data-p="2"><div class="m-h">SPLITS</div>{splits}'
+                + f'<div class="m-hide"><div class="m-h">SPLITS</div>{splits}'
                 + (f'<div class="m-labs"><span style="color:var(--ex-gold)">LABS</span>{labs}</div>' if labs else "")
                 + '</div>'
-                + (f'<div class="m-hide" data-p="3"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else ""))
+                + (f'<div class="m-hide"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else ""))
     m = d.get("mapping") or {}
     nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
                   f'{_esc(x["group"].replace(" Voidstone", ""))}</span>{_esc(x["name"])}</div>' for x in m.get("next", []))
@@ -255,8 +256,8 @@ def render(d: dict, live: bool) -> str:
             f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
             + bar +
-            f'<div class="m-row m-hide" data-p="3" style="margin-top:7px">{stones}</div>'
-            + (f'<div class="m-hide" data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
+            f'<div class="m-row m-hide" style="margin-top:7px">{stones}</div>'
+            + (f'<div class="m-hide"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
 
 
 @ui.page("/mini")
@@ -269,7 +270,7 @@ def mini_page():
     from .. import mini as mini_mod
     hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
     foot = (f'<div class="m-foot"><span class="when-locked">🔒 locked · {hk} or 🔒 to unlock</span>'
-            f'<span class="when-unlocked">Drag to move · corner to resize · 🔓 to lock</span></div>'
+            f'<span class="when-unlocked">Drag to move · corner for width · 🔓 to lock</span></div>'
             '<div class="m-grip" title="Drag to resize"></div>')
     last = {"json": None}
 
@@ -295,6 +296,6 @@ def mini_page():
             last["json"] = j
             box.set_content(BUTTONS + f'<div class="m-body">{html}</div>' + foot)
             ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false);"
-                              " window.ptSetCollapsed && ptSetCollapsed(!!window.ptCollapsed); window.ptFit && ptFit()")
+                              " window.ptSetCollapsed && ptSetCollapsed(!!window.ptCollapsed)")
     refresh()
     ui.timer(3, refresh)

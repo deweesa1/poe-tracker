@@ -199,27 +199,24 @@ def run_mini() -> int:
             apply()
             save()
 
-        def set_collapsed(self, collapsed, need_h=0):
-            """Collapse to the timer and bar (shrinking the window to fit), or expand back."""
-            collapsed = bool(collapsed)
-            try:
-                if collapsed and not state["collapsed"]:
-                    p["expanded_h"] = win.height
-                    if need_h:
-                        win.resize(win.width, max(60, int(need_h)))
-                elif not collapsed and state["collapsed"]:
-                    win.resize(win.width, int(p.get("expanded_h") or 380))
-            except Exception:
-                log.debug("collapse resize failed", exc_info=True)
-            state["collapsed"] = collapsed
-            save()
+        def set_collapsed(self, collapsed):
+            state["collapsed"] = bool(collapsed)
+            save()            # the page then fits the window's height to what's shown
 
-        def resize(self, w, h):
-            # frameless windows have no border to drag, so the page's corner grip calls this
+        def fit(self, css_w, css_h, inner_w, inner_h):
+            """Resize to a size given in page pixels (the page also sends its own
+            current size, which converts them to window units whatever the
+            display scaling)."""
             try:
-                win.resize(max(220, int(w)), max(60, int(h)))
+                w, h = win.width, win.height
+                if css_w and inner_w:
+                    w = max(200, round(w * float(css_w) / float(inner_w)))
+                if css_h and inner_h:
+                    h = max(60, round(h * float(css_h) / float(inner_h)))
+                if (w, h) != (win.width, win.height):
+                    win.resize(int(w), int(h))
             except Exception:
-                log.debug("resize failed", exc_info=True)
+                log.debug("fit failed", exc_info=True)
 
         def close(self):
             save()
