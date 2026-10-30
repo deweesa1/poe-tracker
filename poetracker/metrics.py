@@ -219,17 +219,6 @@ def maps_summary(con, config: Config, league: str | None, character_id: int | No
     }
 
 
-def unmapped_speakers(con, config: Config, league: str | None, character_id: int | None, limit: int = 40) -> list[dict]:
-    f, a = _char_filter(con, league, character_id, "r")
-    rows = _rows(con, f"""
-        SELECT s.speaker, COUNT(*) AS runs, SUM(s.lines) AS lines
-        FROM run_speaker s JOIN run r ON r.id=s.run_id
-        WHERE r.kind='map' {f}
-        GROUP BY s.speaker ORDER BY runs DESC
-    """, a)
-    return [r for r in rows if r["speaker"] not in config.speakers][:limit]
-
-
 def content_of(config: Config, area_id: str, fallback: str | None) -> tuple[str, str]:
     for rule in config.content_rules:
         if re.search(rule["match"], area_id):
@@ -797,9 +786,10 @@ def boss_progress(con, config: Config, league: str, character_id: int | None = N
     for r in _rows(con, f"SELECT boss, character_id, ts_utc FROM boss_kill WHERE character_id IN ({q}) ORDER BY ts_utc", own):
         kills[r["boss"]].append(r)
     out = {}
+    seen_areas = [r[0] for r in con.execute(f"SELECT DISTINCT area_id FROM area_visit WHERE character_id IN ({q})", own)]
     for boss, spec in bosses.items():
         rx = re.compile(spec["area"])
-        area_ids = [r[0] for r in con.execute(f"SELECT DISTINCT area_id FROM area_visit WHERE character_id IN ({q})", own) if rx.search(r[0])]
+        area_ids = [a for a in seen_areas if rx.search(a)]
         visits = []
         if area_ids:
             qa = ",".join("?" * len(area_ids))
@@ -837,8 +827,8 @@ def boss_progress(con, config: Config, league: str, character_id: int | None = N
     return out
 
 
-def voidstones(con, config: Config, league: str, character_id: int | None = None) -> dict:
-    bp = boss_progress(con, config, league, character_id)
+def voidstones(con, config: Config, league: str, character_id: int | None = None, bp: dict | None = None) -> dict:
+    bp = bp if bp is not None else boss_progress(con, config, league, character_id)
     lg = next((l for l in config.leagues if l.name == league), None)
     lg_start = lg.start.strftime("%Y-%m-%dT%H:%M:%SZ") if lg else None
     stones = []
@@ -909,17 +899,6 @@ def current_league(config: Config) -> str | None:
     now = datetime.now(timezone.utc)
     started = [l for l in config.leagues if l.start <= now]
     return started[-1].name if started else None
-
-
-def league_starter(con, league: str | None) -> int | None:
-    """The first of your characters to start the campaign in this league."""
-    if not league:
-        return None
-    row = con.execute("""
-        SELECT v.character_id FROM area_visit v
-        WHERE v.area_id='1_1_1' AND v.character_id IN (SELECT id FROM v_own_character WHERE league=?)
-        ORDER BY v.start_utc LIMIT 1""", (league,)).fetchone()
-    return row[0] if row else None
 
 
 def league_start_status(con, config: Config, league: str | None = None) -> dict:
@@ -1311,7 +1290,7 @@ def campaign_characters(con, league: str | None) -> list[dict]:
         WHERE c.league=? GROUP BY c.id ORDER BY started""", (league,))
 
 
-def mapping_progress(con, config: Config, league: str) -> dict:
+def mapping_progress(con, config: Config, league: str, status: dict | None = None) -> dict:
     """League start endgame for the mapping character (see mapping_character):
     tier progression and milestones, with the league day and that character's
     play time when each was reached."""
@@ -1321,7 +1300,7 @@ def mapping_progress(con, config: Config, league: str) -> dict:
     lg_start = lg.start.strftime("%Y-%m-%dT%H:%M:%SZ") if lg else None
     if not own:
         return {"milestones": [], "tiers": [], "kpis": {}}
-    status = league_start_status(con, config, league)
+    status = status or league_start_status(con, config, league)
     # League start is over at the last Voidstone or after league_start_days:
     # nothing after that moment counts on this page.
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1403,7 +1382,7 @@ def mapping_progress(con, config: Config, league: str) -> dict:
         cid = ids_by_name.get(fk["character"]) if fk else None
         ms.append({"group": "Labyrinth", "name": boss, **stamp(fk["ts_utc"] if fk else None, cid),
                    "attempts": b.get("attempts"), "deaths": b.get("deaths")})
-    vs = voidstones(con, config, league, mchar)
+    vs = voidstones(con, config, league, mchar, bp=bp)
     if cut:
         for st_ in vs["voidstones"]:
             if st_["when"] and st_["when"] > cut:
@@ -1581,7 +1560,7 @@ def mini_status(con, config: Config, league: str | None = None) -> dict:
         return out
     # mapping (or league start finished): the mapping character's endgame
     out["view"] = "mapping"
-    m = mapping_progress(con, config, lg)
+    m = mapping_progress(con, config, lg, status)
     k = m["kpis"]
     nxt = [x for x in m["milestones"] if not x["done"] and not x.get("voidstone")][:3]
     mc = m.get("character_id")

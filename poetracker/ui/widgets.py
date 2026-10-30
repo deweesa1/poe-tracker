@@ -440,5 +440,4 @@ def chart(categories: list, series: list[dict], *, kind: str = "bar", y: str = "
     return ui.echart(opts).style(f"height:{height}px; width:100%")
 
 
-DUR_TIP = "v => { if (v == null) return '–'; v = Math.round(v); const h = Math.floor(v/3600), m = Math.floor((v%3600)/60); return h ? h + 'h ' + m + 'm' : m + 'm ' + (v%60) + 's'; }"
 HOURS_TIP = "v => v == null ? '–' : (Math.round(v*10)/10) + ' h'"

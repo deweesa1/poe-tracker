@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from typing import Callable
 
 from nicegui import ui
@@ -61,15 +62,25 @@ class State:
         """What cached results depend on. A league that has ended can't get new
         game data, so its results stay valid while you play (until a rebuild)."""
         st = self.tracker.status() if self.tracker else {}
-        try:
-            c = self.con()
-            n = c.execute("SELECT (SELECT COUNT(*) FROM currency_snapshot), (SELECT COUNT(*) FROM map_capture)").fetchone()
-            c.close()
-        except Exception:
-            n = (0, 0)
+        n = self._counts()
         if league and self.cfg and league != metrics.current_league(self.cfg):
             return ("past", st.get("data_gen"), st.get("phase"), tuple(n))
         return (st.get("last_event_utc"), st.get("data_gen"), st.get("phase"), tuple(n))
+
+    def _counts(self) -> tuple:
+        """Rows you add by hand (currency, copied maps); re-read at most once a second."""
+        now = time.monotonic()
+        hit = getattr(self, "_counts_hit", None)
+        if hit and now - hit[0] < 1.0:
+            return hit[1]
+        try:
+            c = self.con()
+            n = tuple(c.execute("SELECT (SELECT COUNT(*) FROM currency_snapshot), (SELECT COUNT(*) FROM map_capture)").fetchone())
+            c.close()
+        except Exception:
+            n = (0, 0)
+        self._counts_hit = (now, n)
+        return n
 
     def cached(self, key: tuple, fn: Callable, league: str | None = None):
         v = self.version(league)

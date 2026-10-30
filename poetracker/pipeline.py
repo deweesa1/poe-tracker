@@ -16,7 +16,6 @@ import importlib
 import pkgutil
 import sqlite3
 from collections import defaultdict
-from datetime import datetime
 from typing import Callable
 
 from . import db
@@ -158,12 +157,6 @@ class Context:
         """Keep the open session's end time current (called per batch)."""
         if self.state["session_id"] and self.state["last_ts"]:
             self.update("game_session", self.state["session_id"], end_utc=self.state["last_ts"])
-
-
-def parse_ts(text: str | None) -> datetime | None:
-    if not text:
-        return None
-    return datetime.fromisoformat(text.replace("Z", "+00:00"))
 
 
 def make_parser(config: Config) -> LineParser:

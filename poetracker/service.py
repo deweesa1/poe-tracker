@@ -145,6 +145,34 @@ def release_instance() -> None:
             pass
 
 
+# Files earlier versions left behind that nothing uses any more.
+LEFTOVERS_PROJECT = ("poetracker/server.py", "poetracker/web", "poetracker/ggg")
+LEFTOVERS_DATA = ("league-logos",)
+
+
+def remove_leftovers() -> None:
+    """Delete files from older versions of the tracker (the old browser
+    dashboard, the old league-logo theme...). Your data is never touched."""
+    import shutil
+    for base, names in ((paths.PACKAGE_DIR.parent, LEFTOVERS_PROJECT), (paths.data_dir(), LEFTOVERS_DATA)):
+        for n in names:
+            p = base / n
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                elif p.exists():
+                    p.unlink()
+                else:
+                    continue
+                log.info("removed leftover %s", p)
+            except OSError:
+                log.warning("couldn't remove leftover %s", p)
+    try:
+        (paths.data_dir() / "exports").rmdir()      # only if empty (it was never used)
+    except OSError:
+        pass
+
+
 def safety_copy(name: str = "before-rebuild") -> Path | None:
     """A copy of the database taken just before a rebuild wipes the tables."""
     src = paths.db_path()
@@ -175,6 +203,17 @@ class Tracker:
         self.data_gen = 0          # bumps after a rebuild, so cached results from before are dropped
 
     def status(self) -> dict:
+        """Where reading stands. Pages ask for this many times a second, so the
+        answer is reused for up to a second."""
+        hit = getattr(self, "_status_hit", None)
+        now = time.monotonic()
+        if hit and now - hit[0] < 1.0 and hit[1]["phase"] == self.phase and hit[1]["data_gen"] == self.data_gen:
+            return dict(hit[1])
+        out = self._status()
+        self._status_hit = (now, out)
+        return dict(out)
+
+    def _status(self) -> dict:
         size = None
         if self.log_path and self.log_path.exists():
             size = os.path.getsize(self.log_path)
@@ -249,8 +288,12 @@ class Tracker:
         except Exception as e:
             self.last_error = str(e)
             log.exception("initial read failed")
+        last_ckpt = time.time()
         while not self.stop.is_set():
             self.stop.wait(2.0)
+            if time.time() - last_ckpt > 900:
+                self._checkpoint()
+                last_ckpt = time.time()
             if not self.ingestor:
                 self.log_path = find_log(self.cfg)
                 if self.log_path:
@@ -264,6 +307,15 @@ class Tracker:
             except Exception as e:
                 self.last_error = str(e)
                 log.exception("ingest failed")
+        self._checkpoint()
+
+    def _checkpoint(self) -> None:
+        """Fold the write-ahead log back into tracker.db so it doesn't keep growing."""
+        try:
+            with self.busy:
+                self.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            log.debug("checkpoint skipped", exc_info=True)
 
     def rebuild(self, from_log: bool = False) -> None:
         with self.busy:

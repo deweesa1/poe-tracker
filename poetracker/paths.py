@@ -13,7 +13,6 @@ from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 DEFAULTS_DIR = PACKAGE_DIR / "defaults"
-WEB_DIR = PACKAGE_DIR / "web"
 MIGRATIONS_DIR = PACKAGE_DIR / "migrations"
 
 CONFIG_FILES = ("settings.yaml", "leagues.yaml", "log_patterns.yaml", "areas.yaml", "mechanics.yaml", "milestones.yaml")
@@ -43,12 +42,6 @@ def db_path() -> Path:
 
 def backups_dir() -> Path:
     d = data_dir() / "backups"
-    d.mkdir(exist_ok=True)
-    return d
-
-
-def exports_dir() -> Path:
-    d = data_dir() / "exports"
     d.mkdir(exist_ok=True)
     return d
 

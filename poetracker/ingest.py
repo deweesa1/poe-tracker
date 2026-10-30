@@ -12,7 +12,6 @@ import hashlib
 import logging
 import os
 import sqlite3
-import time
 from pathlib import Path
 
 from . import db
@@ -97,6 +96,8 @@ class Ingestor:
         if not self.log_path.exists():
             return 0
         source, offset = self._position()
+        if offset and os.path.getsize(self.log_path) <= offset:
+            return 0          # nothing new: no parsing, no database write
         head = db.get_state(self.con, "log_head", None)
         if offset == 0 or not head or head[0] < HEAD_BYTES:
             n = min(HEAD_BYTES, os.path.getsize(self.log_path))
@@ -200,10 +201,3 @@ def rebuild(con: sqlite3.Connection, config: Config, log_path: Path | None, from
     con.commit()
     return n
 
-
-def wait_for_log(path: Path, stop, interval: float = 10.0) -> bool:
-    while not stop.is_set():
-        if path.exists():
-            return True
-        time.sleep(interval)
-    return False

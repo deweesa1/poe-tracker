@@ -32,12 +32,6 @@ capture_link_minutes: 10
 # counted as active play time.
 idle_gap_minutes: 15
 
-# GGG API (OAuth). Off until GGG accepts new applications.
-api:
-  enabled: false
-  client_id: ""
-  contact_email: ""
-
 # League start mode: during a new league's campaign only the Campaign page is
 # shown (with Overview and Standard), then Mapping until all four Voidstones.
 league_start_mode: true

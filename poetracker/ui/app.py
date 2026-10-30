@@ -37,6 +37,7 @@ def run(window: str | None = None, port: int | None = None) -> None:
     else:
         log.warning("Client.txt not found. Set log_path in %s", paths.config_dir() / "settings.yaml")
     tracker.start()
+    service.remove_leftovers()
     STATE.cfg = cfg
     STATE.tracker = tracker
     from .. import updater as updater_mod

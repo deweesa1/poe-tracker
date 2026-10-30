@@ -7,8 +7,7 @@ from .. import captures, config as config_mod, db, metrics
 from . import fmt
 from .layout import STATE, auto_refresh, character_select, frame, is_open, league_select, league_start, locked
 from .widgets import LINE as LINE_C
-from .widgets import (BLUE, DUR_TIP, GOLD, GREEN, GREY, HOURS_TIP, PALETTE, RED, TEAL, VIOLET, card, chart, empty,
-                      heading, kpis, note, table)
+from .widgets import (BLUE, GOLD, GREY, HOURS_TIP, PALETTE, RED, TEAL, card, chart, empty, heading, kpis, note, table)
 
 
 def _reload():
