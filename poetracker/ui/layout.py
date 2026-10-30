@@ -31,6 +31,7 @@ class State:
     def __init__(self):
         self.cfg: config_mod.Config | None = None
         self.tracker = None
+        self.updater = None
         self._prefs: dict = {}
         self._lock = threading.Lock()
         self._cache: dict = {}
@@ -224,6 +225,11 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                 lbl = ui.label(text)
                 if tip:
                     lbl.tooltip(tip)
+                up = STATE.updater.state if STATE.updater else {}
+                if up.get("available"):
+                    ui.button(f"Update available ({up['behind']})", icon="system_update",
+                              on_click=update_dialog).props("dense unelevated size=sm color=primary text-color=dark").classes(
+                        "q-px-sm")
                 if STATE.tracker and STATE.tracker.status().get("clipboard"):
                     ui.icon("content_paste", size="16px").tooltip(
                         "Map capture is on: Ctrl+C on a map in game saves it (see Maps → Detailed Maps).")
@@ -232,6 +238,37 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
         ui.timer(5, draw_status)
 
     return ui.column().classes("w-full q-pa-lg gap-4").style("max-width:1500px")
+
+
+def update_dialog() -> None:
+    """What's new on GitHub, with a button that updates and restarts."""
+    from nicegui import app, run
+    from .. import updater as updater_mod
+    up = STATE.updater.state
+    with ui.dialog() as dlg, ui.card().classes("pt-card").style("min-width:min(520px, 92vw)"):
+        ui.label("Update Available").classes("pt-h2")
+        ui.label(f"{up['behind']} change{'s' if up['behind'] != 1 else ''} since your version "
+                 f"({up.get('version') or '?'}):").classes("pt-sub")
+        with ui.column().classes("gap-1 q-my-sm"):
+            for c in up.get("changes") or []:
+                ui.label(f"• {c}").classes("text-sm")
+        msg = ui.label("").classes("pt-note")
+
+        async def go():
+            btn.disable()
+            msg.set_text("Downloading the update…")
+            ok, text = await run.io_bound(STATE.updater.apply)
+            if not ok:
+                msg.set_text(text)
+                btn.enable()
+                return
+            msg.set_text("Updated. Restarting the tracker…")
+            updater_mod.restart_app()
+            app.shutdown()
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Later", on_click=dlg.close).props("flat")
+            btn = ui.button("Update and restart", icon="system_update", on_click=go).props("unelevated")
+    dlg.open()
 
 
 def league_select(on_change: Callable, label: str = "League") -> None:

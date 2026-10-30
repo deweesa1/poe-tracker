@@ -108,25 +108,31 @@ def daily_backup(keep: int = 7) -> Path | None:
 _LOCK_HANDLE = None
 
 
-def single_instance() -> bool:
+def single_instance(wait: float = 8.0) -> bool:
     """Take an exclusive lock on tracker.lock in the data folder. Returns False
-    when another copy of the tracker already holds it (two copies writing the
-    same database at once corrupts it)."""
+    when another copy of the tracker still holds it after `wait` seconds (two
+    copies writing the same database at once corrupts it). The short wait lets
+    a restart after an update start while the old copy is closing."""
     global _LOCK_HANDLE
-    f = open(paths.data_dir() / "tracker.lock", "a+")
-    try:
-        if sys.platform == "win32":
-            import msvcrt
-            f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        f.close()
-        return False
-    _LOCK_HANDLE = f          # keep it open (and locked) for the life of the process
-    return True
+    deadline = time.time() + wait
+    while True:
+        f = open(paths.data_dir() / "tracker.lock", "a+")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            f.close()
+            if time.time() >= deadline:
+                return False
+            time.sleep(0.5)
+            continue
+        _LOCK_HANDLE = f          # keep it open (and locked) for the life of the process
+        return True
 
 
 def safety_copy(name: str = "before-rebuild") -> Path | None:

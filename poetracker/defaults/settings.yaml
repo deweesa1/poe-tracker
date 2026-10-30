@@ -46,3 +46,6 @@ league_start_mode: true
 theme: exile
 # Exile look: give each league its own accent colour (see leagues.yaml to change one).
 league_colors: true
+# Check github.com/deweesa1/poe-tracker for a newer version every 30 minutes.
+update_check: true
+update_repo: https://github.com/deweesa1/poe-tracker.git

@@ -1415,6 +1415,63 @@ def settings_page():
             lgs = list(reversed(STATE.cfg.leagues))[:4]
             ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
                 "pt-note q-mt-sm")
+        with card("Updates"):
+            from nicegui import run as ng_run
+            upd = STATE.updater
+            box = ui.column().classes("w-full gap-1")
+
+            def draw_updates():
+                st = upd.state if upd else {}
+                box.clear()
+                with box:
+                    if not st.get("git"):
+                        ui.label("Git isn't installed, so the tracker can't check for updates. Install Git for Windows "
+                                 "(https://git-scm.com/download/win), then restart the tracker.").classes("pt-sub")
+                        return
+                    if not st.get("connected"):
+                        ui.label("This folder isn't connected to GitHub yet (it came from a download). Connect it once "
+                                 "and the tracker keeps itself up to date from github.com/deweesa1/poe-tracker. "
+                                 "Files you added to the folder yourself are left alone.").classes("pt-sub")
+                        return
+                    import time as _t
+                    checked = st.get("checked")
+                    ui.label(f"Your version: {st.get('version') or '?'}").classes("text-sm")
+                    line = ("Checking…" if not checked else
+                            f"Last checked {int((_t.time() - checked) // 60)} min ago" if _t.time() - checked >= 60 else
+                            "Last checked just now")
+                    if st.get("error"):
+                        line += f" · couldn't reach GitHub ({st['error']})"
+                    elif checked:
+                        line += f" · {st['behind']} update{'s' if st['behind'] != 1 else ''} waiting" if st.get(
+                            "available") else " · you're up to date"
+                    ui.label(line).classes("pt-note")
+
+            async def check_now():
+                ui.notify("Checking GitHub…")
+                await ng_run.io_bound(upd.check)
+                draw_updates()
+                if upd.state.get("available"):
+                    from .layout import update_dialog
+                    update_dialog()
+
+            async def connect():
+                ui.notify("Connecting this folder to GitHub…")
+                ok, text = await ng_run.io_bound(upd.connect)
+                ui.notify(text, type="positive" if ok else "negative")
+                await ng_run.io_bound(upd.check)
+                draw_updates()
+
+            def set_auto(e):
+                config_mod.save_settings({"update_check": bool(e.value)})
+                STATE.cfg.settings["update_check"] = bool(e.value)
+
+            draw_updates()
+            with ui.row().classes("items-center gap-3 q-mt-sm"):
+                if upd and upd.state.get("git") and not upd.state.get("connected"):
+                    ui.button("Connect to GitHub", icon="link", on_click=connect).props("unelevated")
+                else:
+                    ui.button("Check for updates", icon="sync", on_click=check_now).props("outline")
+                ui.switch("Check automatically (every 30 min)", value=bool(s.get("update_check", True)), on_change=set_auto)
         with card("Rebuild"):
             ui.label("Recalculates everything from the raw lines already stored. Use it after editing areas.yaml or "
                      "log_patterns.yaml. \"Re-read Client.txt\" starts from the very beginning of the log file "

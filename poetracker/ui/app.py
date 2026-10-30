@@ -39,6 +39,10 @@ def run(window: str | None = None, port: int | None = None) -> None:
     tracker.start()
     STATE.cfg = cfg
     STATE.tracker = tracker
+    from .. import updater as updater_mod
+    STATE.updater = updater_mod.Updater(cfg.settings.get("update_repo"))
+    if cfg.settings.get("update_check", True):
+        STATE.updater.start_background()
     STATE.load_prefs()
     app.on_shutdown(tracker.stop.set)
 
