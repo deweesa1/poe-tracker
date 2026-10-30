@@ -17,15 +17,16 @@ MINI_CSS = """
 html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
 .nicegui-content { padding: 0 !important; }
 .q-page, .q-layout, .q-page-container { background: transparent !important; min-height: 0 !important; }
-.mini { box-sizing: border-box; width: 100vw; height: 100vh; padding: 10px 12px 24px; overflow: hidden;
+.mini { box-sizing: border-box; width: 100vw; height: 100vh; padding: 10px 12px 6px; overflow: hidden;
+  display: flex; flex-direction: column;
   font-family: "Segoe UI", system-ui, sans-serif; color: var(--ex-text);
   background: linear-gradient(180deg, var(--ex-panel) 0%, var(--ex-panel-2) 100%);
   border: 1px solid var(--ex-line); box-shadow: inset 0 0 0 1px #000, inset 0 0 0 2px var(--ex-a10); }
 .mini.unlocked { border-color: var(--ex-gold); }
 .m-top { display: flex; align-items: center; gap: 6px; font-family: 'Cinzel', serif; font-weight: 600; font-size: 11px;
   letter-spacing: .05em; color: var(--ex-muted); white-space: nowrap; overflow: hidden; }
-.m-top .m-lg { color: var(--ex-gold-hi); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
-.m-top .ch { flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.m-top .m-lg { color: var(--ex-gold-hi); overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; max-width: 70%; }
+.m-top .ch { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ex-dim); }
 .m-top .sp { flex: 1 1 0; min-width: 0; }
 .m-btn { cursor: pointer; color: var(--ex-muted); font-size: 13px; padding: 0 3px; display: none; }
 .m-btn:hover { color: var(--ex-gold-hi); }
@@ -49,8 +50,10 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-bar div i.cur { background: var(--ex-cur); }
 .m-bar div i.skip { background: var(--ex-line); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
-.m-foot { position: fixed; left: 12px; right: 12px; bottom: 6px; font-size: 10.5px; color: var(--ex-dim);
+.m-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.m-foot { flex: 0 0 auto; padding-top: 4px; font-size: 10.5px; color: var(--ex-dim);
   display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
+.m-cut { display: none !important; }
 .m-foot .when-unlocked { display: none; color: var(--ex-gold); }
 .mini.unlocked .m-foot .when-unlocked { display: inline; } .mini.unlocked .m-foot .when-locked { display: none; }
 """
@@ -75,6 +78,20 @@ TICK_JS = """
     document.querySelectorAll('.mini').forEach(el => el.classList.toggle('unlocked', !locked));
     window.ptLocked = locked;
   };
+  // Small window: drop whole sections from the bottom (highest data-p first)
+  // instead of cutting text in half.
+  window.ptFit = function () {
+    const body = document.querySelector('.m-body');
+    if (!body) return;
+    const opts = Array.from(body.querySelectorAll('[data-p]'));
+    opts.forEach(el => el.classList.remove('m-cut'));
+    opts.sort((a, b) => b.dataset.p - a.dataset.p);
+    for (const el of opts) {
+      if (body.scrollHeight <= body.clientHeight + 1) break;
+      el.classList.add('m-cut');
+    }
+  };
+  window.addEventListener('resize', () => window.ptFit());
   window.ptApi = function (name) { try { window.pywebview.api[name](); } catch (e) {} };
 })();
 </script>
@@ -99,8 +116,8 @@ def render(d: dict, live: bool) -> str:
                f'<div class="m-dim">No league has started yet.</div>'
     if d.get("view") == "campaign":
         c = d.get("campaign")
-        head = (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span>'
-                f'<span class="ch">· {_esc(c["character"]) if c else "campaign"}</span><span class="sp"></span>{top_buttons}</div>')
+        head = (f'<div class="m-top"><span class="m-lg">{_esc(c["character"]) if c else "Campaign"}</span>'
+                f'<span class="ch">{_esc(d["league"])}</span><span class="sp"></span>{top_buttons}</div>')
         if not c:
             return head + '<div class="m-dim">Waiting for your first character. The timer starts in The Twilight Strand.</div>'
         on = live and bool(c["anchor_utc"]) and not c["afk"]
@@ -127,12 +144,13 @@ def render(d: dict, live: bool) -> str:
         return (head
                 + f'<div class="m-clock">{clock}{pct}</div>'
                 + f'<div class="m-where">{where}</div>'
-                + f'<div class="m-row"><span>Act <b>{act_t}</b></span><span>Lv <b>{c["level"]}</b></span>'
-                  f'<span>Deaths <b>{c["deaths"]}</b></span></div>'
+                + f'<div class="m-row">'
+                + (f'<span>Acts <b>10/10</b></span>' if c["completed"] else f'<span>Act <b>{act_t}</b></span>')
+                + f'<span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span></div>'
                 + f'<div class="m-bar">{bar}</div>'
-                + (f'<div class="m-h">SPLITS</div>{splits}' if splits else "")
-                + (f'<div class="m-h">NEXT</div>{nxt}' if nxt else "")
-                + f'<div class="m-row" style="margin-top:6px"><span>Quest points <b>{c["quest_points"]}/{c["quest_total"]}</b></span>'
+                + (f'<div data-p="3"><div class="m-h">SPLITS</div>{splits}</div>' if splits else "")
+                + (f'<div data-p="2"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else "")
+                + f'<div class="m-row" data-p="4" style="margin-top:6px"><span>Quest points <b>{c["quest_points"]}/{c["quest_total"]}</b></span>'
                   f'<span>Trials <b>{c["trials"]}/12</b></span></div>')
     m = d.get("mapping") or {}
     nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
@@ -149,7 +167,7 @@ def render(d: dict, live: bool) -> str:
 
     def rate(v):
         return "–" if v is None else fmt.num(v, 1)
-    return (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span><span class="ch">· {_esc(m.get("character") or "")}</span>'
+    return (f'<div class="m-top"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span><span class="ch">{_esc(d["league"])}</span>'
             f'<span class="sp"></span>{top_buttons}</div>'
             f'<div class="m-clock">{clock}<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span></div>'
             + (f'<div class="m-where">League start finished {fmt.when(m["ended"])}</div>' if m.get("ended") else
@@ -157,8 +175,8 @@ def render(d: dict, live: bool) -> str:
             f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
             f'<div class="m-bar">{bar}</div>'
-            f'<div class="m-row" style="margin-top:7px">{stones}</div>'
-            + (f'<div class="m-h">NEXT UP</div>{nxt}' if nxt and not m.get("ended") else ""))
+            f'<div class="m-row" data-p="3" style="margin-top:7px">{stones}</div>'
+            + (f'<div data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
 
 
 @ui.page("/mini")
@@ -194,7 +212,8 @@ def mini_page():
         j = json.dumps([html])
         if j != last["json"]:
             last["json"] = j
-            box.set_content(html + foot)
-            ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false)")
+            box.set_content(f'<div class="m-body">{html}</div>' + foot)
+            ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false);"
+                              " window.ptFit && ptFit()")
     refresh()
     ui.timer(3, refresh)
