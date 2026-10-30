@@ -4,8 +4,8 @@ mini button does this).
 
 Locked (default while playing): clicks pass through to the game and the
 window never takes focus. Unlocked: drag it, resize it, use its buttons.
-Toggle with the hotkey (Ctrl+Shift+F11 by default, mini_hotkey in settings.yaml). It's picked so it
-clashes with neither Path of Exile's default keys nor Awakened PoE Trade's (which uses F5 and F9).
+Toggle with the hotkey (mini_hotkey in settings.yaml, set in Settings), or with the
+lock button in the main window's side menu.
 """
 from __future__ import annotations
 
@@ -21,14 +21,21 @@ from . import config as config_mod, paths
 
 log = logging.getLogger(__name__)
 TITLE = "PoE Tracker - Mini"
-DEFAULT_HOTKEY = "ctrl+shift+f11"
+DEFAULT_HOTKEY = "ctrl+alt+m"
 
 
 def hotkey_label(settings: dict | None) -> str:
     """'ctrl+shift+f11' -> 'Ctrl+Shift+F11' for display."""
     text = (settings or {}).get("mini_hotkey") or DEFAULT_HOTKEY
-    return "+".join(p.upper() if p.startswith("f") and p[1:].isdigit() else p.capitalize()
-                    for p in text.replace(" ", "").split("+"))
+    nice = {"scrolllock": "Scroll Lock", "pageup": "Page Up", "pagedown": "Page Down", "numlock": "Num Lock"}
+
+    def one(p):
+        if p in nice:
+            return nice[p]
+        if p.startswith("num") and p[3:].isdigit():
+            return f"Num {p[3:]}"
+        return p.upper() if p.startswith("f") and p[1:].isdigit() else p.capitalize()
+    return "+".join(one(p) for p in text.replace(" ", "").split("+"))
 PORT_FILE = "ui_port.txt"
 
 
@@ -74,7 +81,10 @@ def _save_prefs(p: dict) -> None:
         pass
 
 
-VK = {**{f"f{i}": 0x6F + i for i in range(1, 13)}, **{chr(c): c for c in range(ord("0"), ord("9") + 1)},
+VK = {"scrolllock": 0x91, "pause": 0x13, "insert": 0x2D, "home": 0x24, "end": 0x23, "pageup": 0x21,
+      "pagedown": 0x22, "delete": 0x2E, "numlock": 0x90,
+      **{f"num{i}": 0x60 + i for i in range(10)},
+      **{f"f{i}": 0x6F + i for i in range(1, 13)}, **{chr(c): c for c in range(ord("0"), ord("9") + 1)},
       **{chr(c).lower(): c for c in range(ord("A"), ord("Z") + 1)}}
 MODS = {"alt": 0x1, "ctrl": 0x2, "control": 0x2, "shift": 0x4, "win": 0x8}
 
@@ -182,6 +192,18 @@ def run_mini() -> int:
             apply()
             save()
 
+        def set_lock(self, locked):
+            state["locked"] = bool(locked)
+            apply()
+            save()
+
+        def resize(self, w, h):
+            # frameless windows have no border to drag, so the page's corner grip calls this
+            try:
+                win.resize(max(220, int(w)), max(140, int(h)))
+            except Exception:
+                log.debug("resize failed", exc_info=True)
+
         def close(self):
             save()
             closing.set()
@@ -212,9 +234,14 @@ def run_mini() -> int:
                 state["locked"] = not state["locked"]
                 apply()
                 save()
-            threading.Thread(target=lambda: win32.hotkey_loop(hk[0], hk[1], toggle) or
-                             log.warning("mini hotkey %s is taken by another program", s.get("mini_hotkey")),
-                             daemon=True, name="mini-hotkey").start()
+            def hot():
+                p.update(hotkey=s.get("mini_hotkey", DEFAULT_HOTKEY), hotkey_ok=True)
+                _save_prefs(p)
+                if not win32.hotkey_loop(hk[0], hk[1], toggle):
+                    log.warning("mini hotkey %s is taken by another program", s.get("mini_hotkey"))
+                    p.update(hotkey_ok=False)
+                    _save_prefs(p)
+            threading.Thread(target=hot, daemon=True, name="mini-hotkey").start()
         # remember where it was put; close when the main tracker closes
         last, gone = None, 0
         while not closing.wait(5):

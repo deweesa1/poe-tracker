@@ -48,5 +48,5 @@ update_repo: https://github.com/deweesa1/poe-tracker.git
 
 # Mini tracker (always-on-top window).
 mini_on_start: false        # open it whenever the tracker starts
-mini_hotkey: ctrl+shift+f11 # lock/unlock (locked = clicks pass through). Not used by PoE or Awakened PoE Trade
+mini_hotkey: ctrl+alt+m        # lock/unlock (locked = clicks pass through); change it in Settings
 mini_opacity: 0.92          # 0.4 (very see-through) to 1.0 (solid)

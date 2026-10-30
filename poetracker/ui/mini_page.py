@@ -55,7 +55,11 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
   display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
 .m-cut { display: none !important; }
 .m-foot .when-unlocked { display: none; color: var(--ex-gold); }
-.mini.unlocked .m-foot .when-unlocked { display: inline; } .mini.unlocked .m-foot .when-locked { display: none; }
+.mini.unlocked .m-foot .when-unlocked { display: inline; }
+.m-grip { display: none; position: fixed; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 0 50%, var(--ex-gold) 50% 58%, transparent 58% 70%,
+  var(--ex-gold) 70% 78%, transparent 78%); opacity: .8; }
+.mini.unlocked .m-grip { display: block; } .mini.unlocked .m-foot .when-locked { display: none; }
 """
 
 TICK_JS = """
@@ -92,7 +96,26 @@ TICK_JS = """
     }
   };
   window.addEventListener('resize', () => window.ptFit());
-  window.ptApi = function (name) { try { window.pywebview.api[name](); } catch (e) {} };
+  window.ptApi = function (name, ...args) { try { window.pywebview.api[name](...args); } catch (e) {} };
+  // corner grip: frameless windows have no border to resize from
+  let rs = null, rsT = 0;
+  document.addEventListener('pointerdown', (e) => {
+    const g = e.target.closest('.m-grip');
+    if (!g) return;
+    e.preventDefault(); e.stopPropagation();
+    g.setPointerCapture(e.pointerId);
+    rs = {x: e.screenX, y: e.screenY, w: window.innerWidth, h: window.innerHeight, g: g};
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    if (!rs) return;
+    const now = Date.now();
+    if (now - rsT < 30) return;
+    rsT = now;
+    ptApi('resize', rs.w + e.screenX - rs.x, rs.h + e.screenY - rs.y);
+  }, true);
+  const rsEnd = (e) => { if (rs) { ptApi('resize', rs.w + e.screenX - rs.x, rs.h + e.screenY - rs.y); rs = null; } };
+  document.addEventListener('pointerup', rsEnd, true);
+  document.addEventListener('pointercancel', () => { rs = null; }, true);
 })();
 </script>
 """
@@ -179,6 +202,22 @@ def render(d: dict, live: bool) -> str:
             + (f'<div data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
 
 
+CLIENTS: set = set()     # open mini windows, so the main window can lock/unlock them
+
+
+def set_lock(locked: bool) -> int:
+    """Lock or unlock every open mini tracker (from the main window). Returns how many."""
+    n = 0
+    for c in list(CLIENTS):
+        try:
+            with c:
+                ui.run_javascript(f"ptApi('set_lock', {str(bool(locked)).lower()})")
+            n += 1
+        except Exception:
+            CLIENTS.discard(c)
+    return n
+
+
 @ui.page("/mini")
 def mini_page():
     ui.add_css(palette_css())
@@ -189,7 +228,11 @@ def mini_page():
     from .. import mini as mini_mod
     hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
     foot = (f'<div class="m-foot"><span class="when-locked">🔒 {hk} to unlock</span>'
-            f'<span class="when-unlocked">Drag to move · {hk} to lock</span></div>')
+            f'<span class="when-unlocked">Drag to move · corner to resize · {hk} to lock</span></div>'
+            '<div class="m-grip" title="Drag to resize"></div>')
+    client = ui.context.client
+    CLIENTS.add(client)
+    client.on_disconnect(lambda: CLIENTS.discard(client))
     last = {"json": None}
 
     def refresh():

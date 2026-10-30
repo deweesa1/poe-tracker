@@ -1,6 +1,8 @@
 """All dashboard pages."""
 from __future__ import annotations
 
+import json
+
 from nicegui import ui
 
 from .. import captures, config as config_mod, db, metrics
@@ -1693,8 +1695,15 @@ def settings_page():
             from .. import mini as mini_mod
             hk = s.get("mini_hotkey", mini_mod.DEFAULT_HOTKEY)
             ui.label(f"Locked: clicks pass straight through to the game and it never takes focus. Unlocked: drag it, "
-                     f"resize it from the edges, or close it. Switch with {mini_mod.hotkey_label(s)}. The default "
-                     f"(Ctrl+Shift+F11) isn't used by Path of Exile or Awakened PoE Trade.").classes("pt-note")
+                     f"resize it from its bottom-right corner, or close it. Switch with {mini_mod.hotkey_label(s)}, or with "
+                     f"the Lock / Unlock buttons under Mini Tracker in the side menu.").classes("pt-note")
+            try:
+                mj = json.loads((paths.data_dir() / "mini.json").read_text(encoding="utf-8"))
+            except Exception:
+                mj = {}
+            if mj.get("hotkey") and mj.get("hotkey_ok") is False:
+                ui.label(f"⚠ {mj['hotkey']} is taken by another program, so it does nothing in the mini tracker. "
+                         "Record a different one below.").classes("text-sm").style("color:#e0a050")
 
             def open_mini():
                 from .. import mini as mini_mod
@@ -1704,7 +1713,8 @@ def settings_page():
             def save_mini():
                 from .. import mini as mini_mod
                 if not mini_mod.parse_hotkey(hk_in.value or ""):
-                    ui.notify("Hotkey like ctrl+shift+f11 (ctrl/alt/shift/win + a letter, number or F1-F12).", type="warning")
+                    ui.notify("Hotkey like ctrl+alt+m or scrolllock (ctrl/alt/shift + a letter, number, F1-F12, "
+                              "Scroll Lock, Pause, Insert, Home, End, Page Up/Down or a numpad key).", type="warning")
                     return
                 config_mod.save_settings({"mini_on_start": bool(on_start.value), "mini_opacity": round(op.value / 100, 2),
                                           "mini_hotkey": (hk_in.value or "").strip().lower()})
@@ -1719,6 +1729,39 @@ def settings_page():
             with ui.row().classes("items-center gap-4 q-mt-sm w-full"):
                 on_start = ui.switch("Open with the tracker", value=bool(s.get("mini_on_start", False)))
                 hk_in = ui.input("Lock hotkey", value=hk).props("outlined dense dark").style("max-width:170px")
+
+                def recorded(e):
+                    v = str(e.args).strip('[]"\' ')
+                    if v:
+                        hk_in.set_value(v)
+                        rec_btn.set_text("Record")
+                        ui.notify(f"Got {v}. Press Save, then reopen the mini tracker.")
+                ui.on("hk_rec", recorded)
+
+                def record():
+                    rec_btn.set_text("Press keys…")
+                    ui.run_javascript(r"""
+const names = {ScrollLock:'scrolllock', Pause:'pause', Insert:'insert', Home:'home', End:'end', PageUp:'pageup',
+               PageDown:'pagedown', Delete:'delete'};
+function onKey(e) {
+  if (['Control','Shift','Alt','Meta'].includes(e.key)) return;
+  e.preventDefault(); e.stopPropagation();
+  let k = null;
+  if (/^F([1-9]|1[0-2])$/.test(e.key)) k = e.key.toLowerCase();
+  else if (/^Key[A-Z]$/.test(e.code)) k = e.code.slice(3).toLowerCase();
+  else if (/^Digit[0-9]$/.test(e.code)) k = e.code.slice(5);
+  else if (/^Numpad[0-9]$/.test(e.code)) k = 'num' + e.code.slice(6);
+  else if (names[e.key]) k = names[e.key];
+  document.removeEventListener('keydown', onKey, true);
+  if (!k) { emitEvent('hk_rec', ''); return; }
+  const mods = [];
+  if (e.ctrlKey) mods.push('ctrl'); if (e.altKey) mods.push('alt'); if (e.shiftKey) mods.push('shift');
+  emitEvent('hk_rec', mods.concat([k]).join('+'));
+}
+document.addEventListener('keydown', onKey, true);
+""")
+                rec_btn = ui.button("Record", icon="keyboard", on_click=record).props("outline dense no-caps").tooltip(
+                    "Click, then press the key combination you want")
                 with ui.column().classes("gap-0").style("min-width:200px"):
                     ui.label("See-through").classes("pt-note")
                     op = ui.slider(min=40, max=100, step=5, value=int(float(s.get("mini_opacity", 0.92)) * 100)).props("label")
