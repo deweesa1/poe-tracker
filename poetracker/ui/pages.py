@@ -1320,16 +1320,6 @@ def settings_page():
                     ui.select({"exile": "Exile (Path of Exile style)", "classic": "Classic"}, value=s.get("theme", "exile"),
                               label="Look", on_change=set_theme).props("outlined dense dark").style("min-width:240px")
 
-                    def set_lc(e):
-                        config_mod.save_settings({"league_colors": e.value})
-                        STATE.cfg.settings["league_colors"] = e.value
-                        _reload()
-                    from .layout import league_color_mode
-                    ui.select({"subtle": "Subtle: highlights only", "full": "Full: the whole app", "off": "Off: Exile gold"},
-                              value=league_color_mode(), label="League colours", on_change=set_lc).props(
-                        "outlined dense dark").style("min-width:230px").tooltip(
-                        "Each league's own colour (from its logo in the league-logos folder, or color: in leagues.yaml).")
-
                 def save():
                     config_mod.save_settings({
                         "log_path": (log_in.value or "").strip(), "timezone": (tz.value or "").strip() or "America/Chicago",

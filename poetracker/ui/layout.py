@@ -9,7 +9,7 @@ from nicegui import ui
 
 from .. import config as config_mod, db, metrics, paths
 from . import fmt
-from .widgets import CSS, DEFAULT_ACCENT, EXILE_CSS, LEAGUE_COLORS, league_css
+from .widgets import CSS, DEFAULT_ACCENT, EXILE_CSS, palette_css
 
 NAV = [
     ("/", "Overview", "space_dashboard"),
@@ -163,44 +163,6 @@ def status_text() -> tuple[str, str, str]:
             "something the tracker uses (entering an area, a level-up, a death...).")
 
 
-def league_color_mode() -> str:
-    """subtle (league colour on a few highlights), full (whole app) or off."""
-    v = STATE.cfg.settings.get("league_colors", "subtle") if STATE.cfg else "subtle"
-    if v is True:
-        return "subtle"
-    if v is False or v is None:
-        return "off"
-    return v if v in ("subtle", "full", "off") else "subtle"
-
-
-def league_accent(league: str | None) -> str:
-    """The accent colour for a league: leagues.yaml 'color', else its saved
-    logo, else the built-in pick, else Exile gold."""
-    if not league or league_color_mode() == "off":
-        return DEFAULT_ACCENT
-    own = (STATE.cfg.extra.get("league_colors") or {}).get(league)
-    if own:
-        return own
-    logo = league_logo(league)
-    if logo:
-        from .widgets import logo_accent
-        picked = logo_accent(logo)
-        if picked:
-            return picked
-    return LEAGUE_COLORS.get(league) or DEFAULT_ACCENT
-
-
-def league_logo(league: str):
-    """A league logo you saved in the data folder's league-logos folder, named
-    after the league (any of png, jpg, jpeg, webp). Only its colours are used."""
-    folder = paths.data_dir() / "league-logos"
-    for ext in ("png", "jpg", "jpeg", "webp"):
-        p = folder / f"{league}.{ext}"
-        if p.exists():
-            return p
-    return None
-
-
 def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):
     """Draw the shared layout. Returns the content column to fill."""
     ui.add_css(CSS)
@@ -208,10 +170,8 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
     primary = "#d9a441"
     if exile:
         ui.add_css(EXILE_CSS)
-        accent = league_accent(STATE.league()) if STATE.cfg else DEFAULT_ACCENT
-        mode = league_color_mode()
-        ui.add_css(league_css(accent, full=(mode == "full")))
-        primary = accent if mode == "full" else DEFAULT_ACCENT
+        ui.add_css(palette_css())
+        primary = DEFAULT_ACCENT
     ui.dark_mode(True)
     ui.colors(primary=primary, secondary="#4fb3a5", accent="#a68bd6", dark="#1d1916", dark_page="#14110f")
 

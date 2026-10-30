@@ -2,8 +2,6 @@
 # contains the first time it appears in the log. Times are approximate:
 # edit them if a character lands in the wrong league, or add new leagues
 # when they launch. A league ends when the next one starts.
-# Optional: color: '#rrggbb' sets that league's accent colour in the Exile look,
-# e.g.  - {name: "Mirage", start: "2026-03-06T19:00:00Z", color: "#4fc2c2"}
 leagues:
   - {name: "Affliction",            start: "2023-12-08T20:00:00Z"}
   - {name: "Necropolis",            start: "2024-03-29T19:00:00Z"}

@@ -131,7 +131,6 @@ def load_config() -> Config:
         speakers=mech.get("speakers") or {},
         milestones=load_yaml("milestones.yaml"),
         content_rules=areas.get("content") or [],
-        extra={"league_colors": {x["name"]: x["color"] for x in lg.get("leagues") or [] if x.get("color")}},
     )
 
 

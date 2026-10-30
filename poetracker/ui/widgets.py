@@ -136,23 +136,9 @@ body, .q-page, .q-layout { color: var(--ex-text);
 """
 
 
-# ---- per-league colours ---------------------------------------------------
-# One accent colour per league; the rest of the palette (borders, panel tint,
-# glow, tabs) is worked out from it. Where it comes from, first match wins:
-#   1. color: '#rrggbb' on the league's line in leagues.yaml
-#   2. a logo saved in the data folder's league-logos folder (its main colour)
-#   3. the guesses below (not checked against the real logos)
-LEAGUE_COLORS = {
-    "Affliction": "#5fb38a",              # Wildwood greens
-    "Necropolis": "#9db36a",              # graveyard, pale sickly green
-    "Settlers of Kalguur": "#d29a4c",     # Kalguuran copper and gold
-    "Phrecia (event)": "#a17cd8",         # Phrecia's violet
-    "Secrets of the Atlas": "#6f9be0",    # starlit blue
-    "Keepers of the Flame": "#e8913a",    # amber flame
-    "Mirage": "#4fc2c2",                  # desert-mirage turquoise
-    "Curse of the Allflame": "#6dbb4a",   # green flame
-}
-DEFAULT_ACCENT = "#c9a35a"                # Exile gold
+# ---- Exile palette ----------------------------------------------------------
+# Every Exile-theme colour is worked out from this one gold.
+DEFAULT_ACCENT = "#c9a35a"
 
 
 def _hls(hex_: str):
@@ -169,49 +155,6 @@ def _hex(h: float, l: float, s: float) -> str:
 
 def _rgba(hex_: str, a: float) -> str:
     return f"rgba({int(hex_[1:3], 16)},{int(hex_[3:5], 16)},{int(hex_[5:7], 16)},{a})"
-
-
-_LOGO_CACHE: dict = {}
-
-
-def logo_accent(path) -> str | None:
-    """The main colour of a league logo image: the most common strongly coloured
-    hue, ignoring dark, washed-out and near-white pixels. Brought to a lightness
-    that reads well as an accent."""
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-    import colorsys
-    key = (str(path), path.stat().st_mtime)
-    if key in _LOGO_CACHE:
-        return _LOGO_CACHE[key]
-    try:
-        im = Image.open(path).convert("RGBA")
-        im.thumbnail((96, 96))
-        bins: dict = {}
-        for r, g, b, a in im.getdata():
-            if a < 128:
-                continue
-            h, l, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-            if sat < 0.30 or l < 0.18 or l > 0.88:
-                continue
-            w = sat * (1 - abs(l - 0.5) * 1.4)
-            hb = int(h * 36) % 36
-            t = bins.setdefault(hb, [0.0, 0.0, 0.0, 0.0])
-            t[0] += w
-            t[1] += w * h
-            t[2] += w * sat
-            t[3] += w * l
-        if not bins:
-            out = None
-        else:
-            w, hs, ss, ls = max(bins.values(), key=lambda t: t[0])
-            out = _hex(hs / w, min(0.64, max(0.52, ls / w)), min(0.85, max(0.45, ss / w)))
-    except Exception:
-        out = None
-    _LOGO_CACHE[key] = out
-    return out
 
 
 def league_palette(accent: str | None) -> dict:
@@ -244,16 +187,12 @@ def league_palette(accent: str | None) -> dict:
     }
 
 
-def league_css(accent: str | None, full: bool = False) -> str:
-    """CSS variables for the Exile look. full=True: the whole app takes the
-    league's colour. Otherwise the app stays Exile gold and only the --lg
-    highlights (league name, header line, logo, active markers, progress bar,
-    finished Voidstones) use the league colour."""
-    lg = league_palette(accent)
-    base = lg if full else league_palette(None)
-    vars_ = {f"--ex-{k}": v for k, v in base.items()}
-    vars_.update({"--lg": lg["gold"], "--lg-hi": lg["gold-hi"], "--lg-cur": lg["cur"],
-                  "--lg-a28": lg["a28"], "--lg-a50": _rgba(lg["gold"], .5)})
+def palette_css() -> str:
+    """CSS variables for the Exile look."""
+    pal = league_palette(None)
+    vars_ = {f"--ex-{k}": v for k, v in pal.items()}
+    vars_.update({"--lg": pal["gold"], "--lg-hi": pal["gold-hi"], "--lg-cur": pal["cur"],
+                  "--lg-a28": pal["a28"], "--lg-a50": _rgba(pal["gold"], .5)})
     return ":root { " + " ".join(f"{k}: {v};" for k, v in vars_.items()) + " }"
 
 
