@@ -1694,9 +1694,11 @@ def settings_page():
                      "fullscreen so it can sit over it.").classes("pt-sub")
             from .. import mini as mini_mod
             hk = s.get("mini_hotkey", mini_mod.DEFAULT_HOTKEY)
-            ui.label(f"Locked: clicks pass straight through to the game and it never takes focus. Unlocked: drag it, "
-                     f"resize it from its bottom-right corner, or close it. Switch with {mini_mod.hotkey_label(s)}, or with "
-                     f"the Lock / Unlock buttons under Mini Tracker in the side menu.").classes("pt-note")
+            ui.label(f"Its buttons (top right): 🔒 lock or unlock, ▾ collapse to just the timer and act bar, ✕ close "
+                     f"(when unlocked). Locked, it stays put and doesn't take focus from the game; unlocked, drag it or "
+                     f"resize it from its bottom-right corner. {mini_mod.hotkey_label(s)} and the Lock / Unlock buttons "
+                     f"in the side menu work too. Turn on 'Clicks pass through' to have locked clicks go to the game "
+                     f"underneath instead; then unlock with the hotkey or the side menu.").classes("pt-note")
             try:
                 mj = json.loads((paths.data_dir() / "mini.json").read_text(encoding="utf-8"))
             except Exception:
@@ -1717,8 +1719,10 @@ def settings_page():
                               "Scroll Lock, Pause, Insert, Home, End, Page Up/Down or a numpad key).", type="warning")
                     return
                 config_mod.save_settings({"mini_on_start": bool(on_start.value), "mini_opacity": round(op.value / 100, 2),
+                                          "mini_click_through": bool(through.value),
                                           "mini_hotkey": (hk_in.value or "").strip().lower()})
                 STATE.cfg.settings.update(mini_on_start=bool(on_start.value), mini_opacity=round(op.value / 100, 2),
+                                          mini_click_through=bool(through.value),
                                           mini_hotkey=(hk_in.value or "").strip().lower())
                 ui.notify("Saved. Close and reopen the mini tracker to use the new settings.", type="positive")
 
@@ -1728,6 +1732,7 @@ def settings_page():
                 ui.notify("Position reset. It opens in the default spot next time.")
             with ui.row().classes("items-center gap-4 q-mt-sm w-full"):
                 on_start = ui.switch("Open with the tracker", value=bool(s.get("mini_on_start", False)))
+                through = ui.switch("Clicks pass through when locked", value=bool(s.get("mini_click_through", False)))
                 hk_in = ui.input("Lock hotkey", value=hk).props("outlined dense dark").style("max-width:170px")
 
                 def recorded(e):

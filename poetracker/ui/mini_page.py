@@ -28,9 +28,6 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-top .m-lg { color: var(--ex-gold-hi); overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; max-width: 70%; }
 .m-top .ch { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ex-dim); }
 .m-top .sp { flex: 1 1 0; min-width: 0; }
-.m-btn { cursor: pointer; color: var(--ex-muted); font-size: 13px; padding: 0 3px; display: none; }
-.m-btn:hover { color: var(--ex-gold-hi); }
-.mini.unlocked .m-btn { display: inline; }
 .m-lock { color: var(--ex-dim); font-size: 11px; }
 .m-clock { font-size: 34px; font-weight: 700; line-height: 1.1; margin-top: 4px; color: var(--ex-value);
   font-variant-numeric: tabular-nums; letter-spacing: .01em; }
@@ -40,13 +37,28 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-row b { color: var(--ex-text); font-weight: 600; }
 .m-h { font-family: 'Cinzel', serif; font-weight: 600; font-size: 10.5px; letter-spacing: .08em; color: var(--ex-gold);
   margin: 9px 0 3px; border-bottom: 1px solid var(--ex-line-dim); padding-bottom: 2px; }
-.m-split { display: flex; font-size: 12.5px; font-variant-numeric: tabular-nums; line-height: 1.55; }
-.m-split .a { width: 52px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); }
+.m-splits { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+.m-split { display: flex; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.55; white-space: nowrap; }
+.m-split .a { width: 24px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
+.m-split.cur .a, .m-split.cur .t { color: var(--ex-gold-hi); } .m-split.todo { color: var(--ex-dim); }
+.m-labs { display: flex; gap: 10px; font-size: 12px; margin-top: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.m-labs span { color: var(--ex-muted); } .m-labs b { color: var(--ex-text); font-weight: 600; }
+.m-where .pct { color: var(--ex-gold); font-weight: 600; margin-left: 6px; }
+.m-btns { position: fixed; top: 7px; right: 8px; display: flex; gap: 2px; z-index: 5; }
+.m-btns span { cursor: pointer; color: var(--ex-muted); font-size: 13px; padding: 1px 4px; border-radius: 3px; }
+.m-btns span:hover { color: var(--ex-gold-hi); background: var(--ex-a10); }
+.m-btns .x { display: none; } .mini.unlocked .m-btns .x { display: inline; }
+.m-top { padding-right: 64px; }
+.mini.collapsed .m-hide, .mini.collapsed .m-foot, .mini.collapsed .m-grip { display: none !important; }
+.mini.collapsed .m-clock { margin-top: 0; padding-right: 64px; }
 .m-next { font-size: 12.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-next .k { color: var(--ex-muted); display: inline-block; width: 44px; }
-.m-bar { display: flex; gap: 2px; height: 5px; margin-top: 7px; }
-.m-bar div { flex: 1; background: var(--ex-line-dim); border-radius: 1px; position: relative; overflow: hidden; }
+.m-bar { display: flex; gap: 2px; height: 16px; margin-top: 7px; }
+.m-bar div { flex: 1; background: var(--ex-line-dim); border-radius: 2px; position: relative; overflow: hidden; min-width: 0; }
 .m-bar div i { position: absolute; inset: 0; background: var(--ex-gold); }
+.m-bar div b { position: relative; display: block; text-align: center; font-size: 9.5px; line-height: 16px; font-weight: 700;
+  color: var(--ex-muted); white-space: nowrap; overflow: hidden; }
+.m-bar div.full b { color: #15120b; }
 .m-bar div i.cur { background: var(--ex-cur); }
 .m-bar div i.skip { background: var(--ex-line); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
@@ -81,7 +93,29 @@ TICK_JS = """
   window.ptSetLocked = function (locked) {
     document.querySelectorAll('.mini').forEach(el => el.classList.toggle('unlocked', !locked));
     window.ptLocked = locked;
+    const b = document.querySelector('.m-btns .l');
+    if (b) { b.textContent = locked ? '🔒' : '🔓'; b.title = locked ? 'Unlock to move or resize' : 'Lock in place'; }
   };
+  window.ptSetCollapsed = function (c) {
+    window.ptCollapsed = c;
+    document.querySelectorAll('.mini').forEach(el => el.classList.toggle('collapsed', c));
+    const b = document.querySelector('.m-btns .c');
+    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show splits' : 'Only the timer and bar'; }
+    if (!c) window.ptFit && window.ptFit();
+  };
+  window.ptToggleCollapse = function () {
+    const c = !window.ptCollapsed;
+    window.ptSetCollapsed(c);
+    // tell the window how tall the collapsed view is, so it can shrink to it
+    const body = document.querySelector('.m-body');
+    const need = body ? Math.ceil(body.scrollHeight + 18) : 0;
+    ptApi('set_collapsed', c, need);
+  };
+  window.ptToggleLock = function () { ptApi('set_lock', !(window.ptLocked !== false)); };
+  // locked: it stays where it is (no dragging), buttons still work
+  document.addEventListener('mousedown', (e) => {
+    if (window.ptLocked !== false && !e.target.closest('.m-btns')) e.stopPropagation();
+  }, true);
   // Small window: drop whole sections from the bottom (highest data-p first)
   // instead of cutting text in half.
   window.ptFit = function () {
@@ -91,7 +125,7 @@ TICK_JS = """
     opts.forEach(el => el.classList.remove('m-cut'));
     opts.sort((a, b) => b.dataset.p - a.dataset.p);
     for (const el of opts) {
-      if (body.scrollHeight <= body.clientHeight + 1) break;
+      if (window.ptCollapsed || body.scrollHeight <= body.clientHeight + 1) break;
       el.classList.add('m-cut');
     }
   };
@@ -101,7 +135,7 @@ TICK_JS = """
   let rs = null, rsT = 0;
   document.addEventListener('pointerdown', (e) => {
     const g = e.target.closest('.m-grip');
-    if (!g) return;
+    if (!g || window.ptLocked !== false) return;
     e.preventDefault(); e.stopPropagation();
     g.setPointerCapture(e.pointerId);
     rs = {x: e.screenX, y: e.screenY, w: window.innerWidth, h: window.innerHeight, g: g};
@@ -130,33 +164,56 @@ def _ticker(base, anchor, on, cls="") -> str:
     return f'<span class="{cls}" data-base="{base or 0:.0f}"{a} data-on="{1 if on else 0}">{fmt.clock(base)}</span>'
 
 
+BUTTONS = ('<div class="m-btns"><span class="l" onclick="ptToggleLock()" title="Lock in place">🔒</span>'
+           '<span class="c" onclick="ptToggleCollapse()" title="Only the timer and bar">▾</span>'
+           '<span class="x" onclick="ptApi(\'close\')" title="Close the mini tracker">✕</span></div>')
+
+
+def _bar(labels: list[str], fills: list[float], cur: int | None) -> str:
+    cells = ""
+    for i, (lab, f) in enumerate(zip(labels, fills)):
+        cls = "cur" if i == cur else ""
+        full = " full" if f >= 0.5 else ""
+        cells += (f'<div class="{full.strip()}"><i class="{cls}" style="width:{max(0.0, min(f, 1.0)) * 100:.0f}%"></i>'
+                  f'<b>{lab}</b></div>')
+    return f'<div class="m-bar">{cells}</div>'
+
+
 def render(d: dict, live: bool) -> str:
-    top_buttons = ('<span class="m-btn" title="Lock: clicks pass through to the game" '
-                   'onclick="ptApi(\'toggle_lock\')">🔒</span>'
-                   '<span class="m-btn" title="Close the mini tracker" onclick="ptApi(\'close\')">✕</span>')
     if not d.get("league"):
-        return f'<div class="m-top"><span class="m-lg">PoE Tracker</span><span class="sp"></span>{top_buttons}</div>' \
-               f'<div class="m-dim">No league has started yet.</div>'
+        return '<div class="m-top"><span class="m-lg">PoE Tracker</span></div><div class="m-dim">No league has started yet.</div>'
     if d.get("view") == "campaign":
         c = d.get("campaign")
-        head = (f'<div class="m-top"><span class="m-lg">{_esc(c["character"]) if c else "Campaign"}</span>'
-                f'<span class="ch">{_esc(d["league"])}</span><span class="sp"></span>{top_buttons}</div>')
+        head = (f'<div class="m-top m-hide"><span class="m-lg">{_esc(c["character"]) if c else "Campaign"}</span>'
+                f'<span class="ch">{_esc(d["league"])}</span></div>')
         if not c:
             return head + '<div class="m-dim">Waiting for your first character. The timer starts in The Twilight Strand.</div>'
         on = live and bool(c["anchor_utc"]) and not c["afk"]
-        clock = _ticker(c["play_s"], c["anchor_utc"], on)
+        cur_act = None if c["completed"] else c["act"]
         pct = f'<span class="pct">{c["progress"] * 100:.0f}%</span>'
-        where = "Campaign complete" if c["completed"] else f'Act {c["act"]} · {_esc(c["zone"] or "")}'
-        act_t = (_ticker(c["act_s"], c["anchor_utc"], on) if c["act_s"] is not None else "–")
-        bar = "".join(
-            f'<div><i style="width:{100 if c["completed"] or a < (c["act"] or 0) else 0}%"></i></div>' for a in range(1, 11))
-        if not c["completed"] and c["act"]:
-            done = {s["act"] for s in c["splits"]}
-            bar = "".join(f'<div><i style="width:{100 if a in done or a < c["act"] else (c["progress"] * 10 - (a - 1)) * 100 if a == c["act"] else 0:.0f}%" '
-                          f'class="{"cur" if a == c["act"] else ""}"></i></div>' for a in range(1, 11))
-        splits = "".join(
-            f'<div class="m-split"><span class="a">Act {s["act"]}</span><span class="t">{fmt.clock(s["split"])}</span>'
-            f'<span class="d">{fmt.dur(s["time_s"], True)}</span></div>' for s in reversed(c["splits"][-3:]))
+        where = (f"Campaign complete{pct}" if c["completed"] else
+                 f'Act {c["act"]} · {_esc(c["zone"] or "")}{pct}')
+        # progress bar: A1-A10, the act you're in fills as you enter its zones
+        done = {x["act"] for x in c["splits"]}
+        fills = [1.0 if (c["completed"] or a in done) else (c.get("act_progress") or 0) if a == cur_act else 0.0
+                 for a in range(1, 11)]
+        bar = _bar([f"A{a}" for a in range(1, 11)], fills, (cur_act - 1) if cur_act else None)
+        # splits: every act, timer at the finish and how long the act took
+        by_act = {x["act"]: x for x in c["splits"]}
+
+        def cell(a):
+            x = by_act.get(a)
+            if x:
+                return (f'<div class="m-split"><span class="a">A{a}</span><span class="t">{fmt.clock(x["split"])}</span>'
+                        f'<span class="d">{fmt.dur(x["time_s"], True)}</span></div>')
+            if a == cur_act:
+                return (f'<div class="m-split cur"><span class="a">A{a}</span>'
+                        f'<span class="t">{_ticker(c["play_s"], c["anchor_utc"], on)}</span>'
+                        f'<span class="d">{_ticker(c["act_s"], c["anchor_utc"], on) if c["act_s"] is not None else ""}</span></div>')
+            return f'<div class="m-split todo"><span class="a">A{a}</span><span class="t">–</span></div>'
+        splits = ('<div class="m-splits">' + "".join(cell(a) + cell(a + 5) for a in range(1, 6)) + '</div>')
+        labs = "".join(f'<span>{_esc(l["lab"])} <b>{fmt.clock(l["split"]) if l["done"] else "–"}</b></span>'
+                       for l in c.get("labs") or [])
         nb, nt = c.get("next_boss"), c.get("next_trial")
         nxt = ""
         if nb:
@@ -165,16 +222,15 @@ def render(d: dict, live: bool) -> str:
         if nt:
             nxt += f'<div class="m-next"><span class="k">Trial</span>{_esc(nt["lab"])} · {_esc(nt["zone"])}</div>'
         return (head
-                + f'<div class="m-clock">{clock}{pct}</div>'
-                + f'<div class="m-where">{where}</div>'
-                + f'<div class="m-row">'
-                + (f'<span>Acts <b>10/10</b></span>' if c["completed"] else f'<span>Act <b>{act_t}</b></span>')
-                + f'<span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span></div>'
-                + f'<div class="m-bar">{bar}</div>'
-                + (f'<div data-p="3"><div class="m-h">SPLITS</div>{splits}</div>' if splits else "")
-                + (f'<div data-p="2"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else "")
-                + f'<div class="m-row" data-p="4" style="margin-top:6px"><span>Quest points <b>{c["quest_points"]}/{c["quest_total"]}</b></span>'
-                  f'<span>Trials <b>{c["trials"]}/12</b></span></div>')
+                + f'<div class="m-clock">{_ticker(c["play_s"], c["anchor_utc"], on)}</div>'
+                + f'<div class="m-where m-hide">{where}</div>'
+                + f'<div class="m-row m-hide" data-p="4"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
+                  f'<span>Quest pts <b>{c["quest_points"]}/{c["quest_total"]}</b></span></div>'
+                + bar
+                + f'<div class="m-hide" data-p="2"><div class="m-h">SPLITS</div>{splits}'
+                + (f'<div class="m-labs"><span style="color:var(--ex-gold)">LABS</span>{labs}</div>' if labs else "")
+                + '</div>'
+                + (f'<div class="m-hide" data-p="3"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else ""))
     m = d.get("mapping") or {}
     nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
                   f'{_esc(x["group"].replace(" Voidstone", ""))}</span>{_esc(x["name"])}</div>' for x in m.get("next", []))
@@ -183,23 +239,24 @@ def render(d: dict, live: bool) -> str:
     on = live and bool(m.get("anchor_utc")) and not m.get("afk")
     clock = _ticker(m.get("mapping_s") or 0, m.get("anchor_utc"), on) if m.get("mapping_s") is not None else "–"
     states = m.get("bar") or ["pending"] * 16
-    bar = "".join(f'<div><i style="width:{0 if st == "pending" else 100}%" class="{"cur" if st == "current" else ("skip" if st == "skipped" else "")}"></i></div>'
-                  for st in states)
+    cur = next((i for i, st in enumerate(states) if st == "current"), None)
+    bar = _bar([str(i) for i in range(1, 17)], [0.0 if st == "pending" else 1.0 for st in states], cur)
     stones = "".join(f'<span title="{_esc(x["name"])} Voidstone" style="color:{"var(--ex-gold)" if x["done"] else "var(--ex-dim)"}">'
                      f'{"☑" if x["done"] else "☐"} {_esc(x["name"][:4])}</span>' for x in m.get("stones", []))
+    tier = f'<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span>'
 
     def rate(v):
         return "–" if v is None else fmt.num(v, 1)
-    return (f'<div class="m-top"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span><span class="ch">{_esc(d["league"])}</span>'
-            f'<span class="sp"></span>{top_buttons}</div>'
-            f'<div class="m-clock">{clock}<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span></div>'
-            + (f'<div class="m-where">League start finished {fmt.when(m["ended"])}</div>' if m.get("ended") else
-               f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}</div>') +
-            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
+    return (f'<div class="m-top m-hide"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span>'
+            f'<span class="ch">{_esc(d["league"])}</span></div>'
+            f'<div class="m-clock">{clock}</div>'
+            + (f'<div class="m-where m-hide">League start finished {fmt.when(m["ended"])}{tier}</div>' if m.get("ended") else
+               f'<div class="m-where m-hide">{phase} · {_esc(m.get("zone") or "")}{tier}</div>') +
+            f'<div class="m-row m-hide"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
-            f'<div class="m-bar">{bar}</div>'
-            f'<div class="m-row" data-p="3" style="margin-top:7px">{stones}</div>'
-            + (f'<div data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
+            + bar +
+            f'<div class="m-row m-hide" data-p="3" style="margin-top:7px">{stones}</div>'
+            + (f'<div class="m-hide" data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
 
 
 CLIENTS: set = set()     # open mini windows, so the main window can lock/unlock them
@@ -227,8 +284,8 @@ def mini_page():
     box = ui.html("", sanitize=False).classes("mini")
     from .. import mini as mini_mod
     hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
-    foot = (f'<div class="m-foot"><span class="when-locked">🔒 {hk} to unlock</span>'
-            f'<span class="when-unlocked">Drag to move · corner to resize · {hk} to lock</span></div>'
+    foot = (f'<div class="m-foot"><span class="when-locked">🔒 locked · {hk} or 🔒 to unlock</span>'
+            f'<span class="when-unlocked">Drag to move · corner to resize · 🔓 to lock</span></div>'
             '<div class="m-grip" title="Drag to resize"></div>')
     client = ui.context.client
     CLIENTS.add(client)
@@ -255,8 +312,8 @@ def mini_page():
         j = json.dumps([html])
         if j != last["json"]:
             last["json"] = j
-            box.set_content(f'<div class="m-body">{html}</div>' + foot)
+            box.set_content(BUTTONS + f'<div class="m-body">{html}</div>' + foot)
             ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false);"
-                              " window.ptFit && ptFit()")
+                              " window.ptSetCollapsed && ptSetCollapsed(!!window.ptCollapsed); window.ptFit && ptFit()")
     refresh()
     ui.timer(3, refresh)

@@ -127,13 +127,14 @@ class Win32:
             time.sleep(0.2)
         return None
 
-    def apply(self, hwnd, locked: bool, opacity: float) -> None:
+    def apply(self, hwnd, locked: bool, opacity: float, click_through: bool = False) -> None:
         ex = self.u.GetWindowLongPtrW(hwnd, self.GWL_EXSTYLE)
         ex |= self.WS_EX_LAYERED | self.WS_EX_TOOLWINDOW          # see-through; no taskbar / Alt+Tab entry
+        ex &= ~(self.WS_EX_TRANSPARENT | self.WS_EX_NOACTIVATE)
         if locked:
-            ex |= self.WS_EX_TRANSPARENT | self.WS_EX_NOACTIVATE   # clicks pass through, never takes focus
-        else:
-            ex &= ~(self.WS_EX_TRANSPARENT | self.WS_EX_NOACTIVATE)
+            ex |= self.WS_EX_NOACTIVATE                            # never takes focus from the game
+            if click_through:
+                ex |= self.WS_EX_TRANSPARENT                       # clicks pass straight through
         self.u.SetWindowLongPtrW(hwnd, self.GWL_EXSTYLE, ex)
         self.u.SetLayeredWindowAttributes(hwnd, 0, int(max(0.3, min(1.0, opacity)) * 255), self.LWA_ALPHA)
         self.u.SetWindowPos(hwnd, self.HWND_TOPMOST, 0, 0, 0, 0,
@@ -174,15 +175,17 @@ def run_mini() -> int:
     cfg = config_mod.load_config()
     s = cfg.settings
     p = _load_prefs()
-    state = {"locked": bool(p.get("locked", False)), "opacity": float(s.get("mini_opacity", 0.92))}
+    state = {"locked": bool(p.get("locked", False)), "opacity": float(s.get("mini_opacity", 0.92)),
+             "through": bool(s.get("mini_click_through", False)), "collapsed": bool(p.get("collapsed", False))}
     win32 = Win32() if sys.platform == "win32" else None
     hwnd_box: dict = {}
 
     def apply():
         if win32 and hwnd_box.get("h"):
-            win32.apply(hwnd_box["h"], state["locked"], state["opacity"])
+            win32.apply(hwnd_box["h"], state["locked"], state["opacity"], state["through"])
         try:
-            win.evaluate_js(f"window.ptSetLocked && window.ptSetLocked({str(state['locked']).lower()})")
+            win.evaluate_js(f"window.ptSetLocked && window.ptSetLocked({str(state['locked']).lower()});"
+                            f"window.ptSetCollapsed && window.ptSetCollapsed({str(state['collapsed']).lower()})")
         except Exception:
             pass
 
@@ -197,10 +200,25 @@ def run_mini() -> int:
             apply()
             save()
 
+        def set_collapsed(self, collapsed, need_h=0):
+            """Collapse to the timer and bar (shrinking the window to fit), or expand back."""
+            collapsed = bool(collapsed)
+            try:
+                if collapsed and not state["collapsed"]:
+                    p["expanded_h"] = win.height
+                    if need_h:
+                        win.resize(win.width, max(60, int(need_h)))
+                elif not collapsed and state["collapsed"]:
+                    win.resize(win.width, int(p.get("expanded_h") or 380))
+            except Exception:
+                log.debug("collapse resize failed", exc_info=True)
+            state["collapsed"] = collapsed
+            save()
+
         def resize(self, w, h):
             # frameless windows have no border to drag, so the page's corner grip calls this
             try:
-                win.resize(max(220, int(w)), max(140, int(h)))
+                win.resize(max(220, int(w)), max(60, int(h)))
             except Exception:
                 log.debug("resize failed", exc_info=True)
 
@@ -212,16 +230,17 @@ def run_mini() -> int:
 
     def save():
         try:
-            p.update(x=win.x, y=win.y, width=win.width, height=win.height, locked=state["locked"])
+            p.update(x=win.x, y=win.y, width=win.width, height=win.height, locked=state["locked"],
+                     collapsed=state["collapsed"])
         except Exception:
-            p.update(locked=state["locked"])
+            p.update(locked=state["locked"], collapsed=state["collapsed"])
         _save_prefs(p)
 
     closing = threading.Event()
     win = webview.create_window(
         TITLE, url + "/mini", js_api=Api(), width=int(p.get("width", 300)), height=int(p.get("height", 380)),
         x=p.get("x"), y=p.get("y"), frameless=True, easy_drag=True, on_top=True, resizable=True,
-        min_size=(220, 160), background_color="#15120b")
+        min_size=(220, 60), background_color="#15120b")
 
     def started():
         if win32:

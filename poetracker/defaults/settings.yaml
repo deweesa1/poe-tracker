@@ -48,5 +48,6 @@ update_repo: https://github.com/deweesa1/poe-tracker.git
 
 # Mini tracker (always-on-top window).
 mini_on_start: false        # open it whenever the tracker starts
-mini_hotkey: ctrl+alt+m        # lock/unlock (locked = clicks pass through); change it in Settings
+mini_click_through: false   # true: clicks on the locked mini tracker go to the game underneath
+mini_hotkey: ctrl+alt+m     # lock/unlock; change it in Settings
 mini_opacity: 0.92          # 0.4 (very see-through) to 1.0 (solid)
