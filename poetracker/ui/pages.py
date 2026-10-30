@@ -12,7 +12,8 @@ from .widgets import (BLUE, DUR_TIP, GOLD, GREEN, GREY, HOURS_TIP, PALETTE, RED,
 
 
 def _reload():
-    STATE.invalidate()
+    # Filters and look changes don't change the data, so cached results stay
+    # (they're keyed by league/character and expire when new game data arrives).
     ui.navigate.reload()
 
 
@@ -84,8 +85,8 @@ def overview_page():
     def content():
         if not lg:
             return _no_data()
-        d = STATE.cached(("overview", lg, cid), lambda c: metrics.overview(c, STATE.cfg, lg, cid, days=0))
-        last = STATE.cached(("last_session", lg, cid), lambda c: metrics.last_session(c, lg, cid))
+        d = STATE.cached(("overview", lg, cid), lambda c: metrics.overview(c, STATE.cfg, lg, cid, days=0), league=lg)
+        last = STATE.cached(("last_session", lg, cid), lambda c: metrics.last_session(c, lg, cid), league=lg)
         t = d["totals"]
 
         with card("Last session"):
@@ -177,7 +178,7 @@ def overview_page():
 
 
 def voidstone_section(lg: str) -> None:
-    v = STATE.cached(("voidstones", lg), lambda c: metrics.voidstones(c, STATE.cfg, lg))
+    v = STATE.cached(("voidstones", lg), lambda c: metrics.voidstones(c, STATE.cfg, lg), league=lg)
     with card(f"Voidstones · {v['obtained']} of {v['total']}"):
         with ui.element("div").classes("w-full").style(
                 "display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(max(220px, calc((100% - 36px) / 4)), 1fr))"):
@@ -270,7 +271,7 @@ def runs_tab(lg, cid):
         if not lg:
             return _no_data()
         d = STATE.cached(("maps", lg, cid), lambda c: {
-            **metrics.maps_summary(c, STATE.cfg, lg, cid), "other": metrics.other_runs(c, STATE.cfg, lg, cid)})
+            **metrics.maps_summary(c, STATE.cfg, lg, cid), "other": metrics.other_runs(c, STATE.cfg, lg, cid)}, league=lg)
         t = d["totals"]
         with ui.column().classes("w-full gap-4"):
             kpis([
@@ -405,7 +406,7 @@ def copied_tab(lg, cid):
 
     @ui.refreshable
     def content():
-        rows = STATE.cached(("mod_runs", lg, cid), lambda c: metrics.map_mod_runs(c, STATE.cfg, lg, cid))
+        rows = STATE.cached(("mod_runs", lg, cid), lambda c: metrics.map_mod_runs(c, STATE.cfg, lg, cid), league=lg)
         selected = [m for m in (STATE.pref(sel_key) or [])]
         stats = metrics.map_mod_stats(rows, selected)
         with ui.column().classes("w-full gap-4"):
@@ -513,7 +514,7 @@ def campaign_page():
     ls = league_start()
     live = ls["phase"] == "campaign"
     lg = ls["league"] if live else STATE.league()
-    lock = STATE.cached(("campaign_lock", lg), lambda c: metrics.campaign_lock(c, lg))
+    lock = STATE.cached(("campaign_lock", lg), lambda c: metrics.campaign_lock(c, lg), league=lg)
     sel = {"id": lock["id"]}
     who = (f"{lock['name']} · first to finish the campaign" if lock["completed"] else
            f"{lock['name']} · furthest along (first to finish Act 10 takes this)") if lock["id"] else ""
@@ -527,7 +528,7 @@ def campaign_page():
                 return empty(f"Waiting for your first character in {lg}. Splits start in The Twilight Strand.")
             return empty("No campaign runs in this league. A run starts in The Twilight Strand.")
         cid = sel["id"]
-        sp = STATE.cached(("splits", cid), lambda c: metrics.campaign_splits(c, cid))
+        sp = STATE.cached(("splits", cid), lambda c: metrics.campaign_splits(c, cid), league=lg)
         if not sp:
             return empty("No campaign for this character.")
         acts = {a["act"]: a for a in sp["acts"]}
@@ -794,7 +795,7 @@ def mapping_page():
     ls = league_start()
     live = ls["phase"] == "mapping"
     lg = ls["league"] if live else STATE.league()
-    lock = STATE.cached(("mapping_lock", lg), lambda c: metrics.mapping_lock(c, lg)) if lg else {"id": None}
+    lock = STATE.cached(("mapping_lock", lg), lambda c: metrics.mapping_lock(c, lg), league=lg) if lg else {"id": None}
     who = (f"{lock['name']} · first to run a T16 map" if lock.get("t16") else
            f"{lock['name']} · highest tier so far (first to a T16 map takes this)") if lock.get("id") else ""
     body = frame("/mapping", "League Start Mapping", " · ".join(x for x in (lg, who) if x),
@@ -804,7 +805,7 @@ def mapping_page():
     def content():
         if not lg:
             return _no_data()
-        m = STATE.cached(("mapping", lg), lambda c: metrics.mapping_progress(c, STATE.cfg, lg))
+        m = STATE.cached(("mapping", lg), lambda c: metrics.mapping_progress(c, STATE.cfg, lg), league=lg)
         k = m["kpis"]
         if not k:
             return empty("No characters in this league yet.")
@@ -898,7 +899,8 @@ def character_page():
         cid = sel["id"]
         if not cid:
             return empty("No characters in this league yet.")
-        d = STATE.cached(("character", cid), lambda c: {**metrics.character_detail(c, cid), "campaign": metrics.campaign_for(c, cid)})
+        d = STATE.cached(("character", cid), lambda c: {**metrics.character_detail(c, cid), "campaign": metrics.campaign_for(c, cid)},
+                         league=lg)
         ch = d["character"]
         ui.label(f"{ch['name']} · {ch['class'] or ''} · level {ch['level'] or '?'} · first seen {fmt.date(ch['first_seen'])}").classes("pt-h2 q-mt-sm")
         cp = d["campaign"]
@@ -975,7 +977,7 @@ def atlas_page():
     def content():
         if not lg:
             return _no_data()
-        d = STATE.cached(("atlas", lg), lambda c: metrics.atlas(c, STATE.cfg, lg))
+        d = STATE.cached(("atlas", lg), lambda c: metrics.atlas(c, STATE.cfg, lg), league=lg)
         t = d["tree"]
         kpis([
             ("Points allocated (known)", fmt.num(t["count"])),
@@ -1024,7 +1026,7 @@ def currency_page():
 
     @ui.refreshable
     def content():
-        d = STATE.cached(("currency", lg), lambda c: metrics.currency(c, lg))
+        d = STATE.cached(("currency", lg), lambda c: metrics.currency(c, lg), league=lg)
         snaps = d["snapshots"]
         last = snaps[0] if snaps else None
         kpis([
@@ -1138,7 +1140,7 @@ def trades_page():
 
     @ui.refreshable
     def content():
-        d = STATE.cached(("trades", lg), lambda c: metrics.trades(c, lg))
+        d = STATE.cached(("trades", lg), lambda c: metrics.trades(c, lg), league=lg)
         c = d["counts"]
         kpis([("Offers received", fmt.num(c["incoming"]), "people wanting your items"),
               ("Offers sent", fmt.num(c["outgoing"])),
@@ -1488,3 +1490,44 @@ def settings_page():
         with card("GGG API"):
             ui.label("Stash currency, gear, gems and the full passive tree need GGG's OAuth API. GGG isn't accepting new "
                      "developer applications right now, so this stays off. Everything else works from your log.").classes("pt-sub")
+
+
+# ====================================================================== warm-up
+def warm_league(lg: str) -> None:
+    """Work out a league's main pages ahead of time (same keys the pages use),
+    so switching to it is quick."""
+    STATE.characters(lg)
+    STATE.cached(("overview", lg, None), lambda c: metrics.overview(c, STATE.cfg, lg, None, days=0), league=lg)
+    STATE.cached(("last_session", lg, None), lambda c: metrics.last_session(c, lg, None), league=lg)
+    STATE.cached(("voidstones", lg), lambda c: metrics.voidstones(c, STATE.cfg, lg), league=lg)
+    lock = STATE.cached(("campaign_lock", lg), lambda c: metrics.campaign_lock(c, lg), league=lg)
+    if lock.get("id"):
+        cid = lock["id"]
+        STATE.cached(("splits", cid), lambda c: metrics.campaign_splits(c, cid), league=lg)
+    STATE.cached(("mapping_lock", lg), lambda c: metrics.mapping_lock(c, lg), league=lg)
+    STATE.cached(("mapping", lg), lambda c: metrics.mapping_progress(c, STATE.cfg, lg), league=lg)
+
+
+def start_warmup() -> None:
+    import logging
+    import threading
+    import time
+    from .layout import busy
+
+    def loop():
+        done_gen = None
+        while True:
+            time.sleep(5)
+            try:
+                st = STATE.tracker.status() if STATE.tracker else {}
+                if busy() or st.get("phase") != "live" or st.get("data_gen") == done_gen:
+                    continue
+                names = STATE.league_names()
+                cur = STATE.league()
+                for lg in ([cur] if cur in names else []) + [n for n in names if n != cur]:
+                    warm_league(lg)
+                done_gen = st.get("data_gen")
+            except Exception:
+                logging.getLogger(__name__).exception("warm-up failed")
+                time.sleep(60)
+    threading.Thread(target=loop, daemon=True, name="warmup").start()

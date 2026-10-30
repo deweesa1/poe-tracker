@@ -83,15 +83,15 @@ EXILE_CSS = """
 @font-face { font-family: 'Cinzel'; font-weight: 600; src: url('/static/fonts/cinzel-latin-600-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Cinzel'; font-weight: 700; src: url('/static/fonts/cinzel-latin-700-normal.woff2') format('woff2'); }
 :root { --ex-gold: #c9a35a; --ex-gold-hi: #f0d595; --ex-text: #ddd0b4; --ex-muted: #a38d6d; --ex-dim: #7d6b54;
-        --ex-line: #4a3822; --ex-line-dim: #2b2117; --ex-panel: #15100b; --ex-panel-2: #0f0b08; }
+        --ex-line: #5c4a2c; --ex-line-dim: #3a2f1f; --ex-panel: #221b12; --ex-panel-2: #1b150e; }
 body, .q-page, .q-layout { color: var(--ex-text);
-  background: radial-gradient(ellipse 120% 70% at 50% -10%, var(--ex-glow) 0%, #0d0a07 55%, #080605 100%) fixed !important; }
-.q-header { background: linear-gradient(180deg, var(--ex-head) 0%, #0e0a07 100%) !important; backdrop-filter: none;
+  background: radial-gradient(ellipse 120% 70% at 50% -10%, var(--ex-glow) 0%, var(--ex-bg) 55%, var(--ex-bg-2) 100%) fixed !important; }
+.q-header { background: linear-gradient(180deg, var(--ex-head) 0%, var(--ex-bg) 100%) !important; backdrop-filter: none;
   border-bottom: 1px solid var(--ex-line); box-shadow: 0 1px 0 var(--ex-a18), 0 6px 18px rgba(0,0,0,.55); }
 .pt-title { font-family: 'Cinzel', serif; font-weight: 700; color: var(--ex-gold-hi); letter-spacing: .04em;
   text-shadow: 0 0 14px var(--ex-a28); }
-.pt-sub, .pt-note { color: var(--ex-dim); }
-.q-drawer { background: linear-gradient(180deg, var(--ex-drawer) 0%, #0b0806 100%) !important; border-right: 1px solid var(--ex-line) !important; }
+.pt-sub { color: var(--ex-muted); } .pt-note { color: var(--ex-dim); }
+.q-drawer { background: linear-gradient(180deg, var(--ex-drawer) 0%, var(--ex-bg-2) 100%) !important; border-right: 1px solid var(--ex-line) !important; }
 .q-drawer .text-weight-bold { font-family: 'Cinzel', serif; letter-spacing: .05em; color: var(--ex-gold-hi); }
 .pt-nav .q-item { font-family: 'Cinzel', serif; font-weight: 600; font-size: 13px; letter-spacing: .03em; color: var(--ex-muted);
   border-radius: 2px; border-left: 2px solid transparent; }
@@ -118,7 +118,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .q-table tbody tr:hover > td { background: var(--ex-a06); }
 .q-tabs { border-bottom: 1px solid var(--ex-line); }
 .q-tab { font-family: 'Cinzel', serif; font-weight: 600; letter-spacing: .05em; color: var(--ex-muted);
-  background: linear-gradient(180deg, var(--ex-tab), #0e0a07); border: 1px solid var(--ex-line); border-bottom: none;
+  background: linear-gradient(180deg, var(--ex-tab), var(--ex-panel-2)); border: 1px solid var(--ex-line); border-bottom: none;
   border-radius: 4px 4px 0 0; margin-right: 4px; min-height: 34px; }
 .q-tab--active { color: var(--ex-gold-hi) !important; background: linear-gradient(180deg, var(--ex-tab-on), var(--ex-tab)); }
 .q-tab__indicator { display: none; }
@@ -127,15 +127,17 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .q-field--outlined .q-field__control:before { border-color: var(--ex-line) !important; }
 .pt-ls-name { font-family: 'Cinzel', serif; letter-spacing: .03em; color: var(--ex-gold-hi); }
 .pt-zone-head { font-family: 'Cinzel', serif; letter-spacing: .04em; }
-::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: #0b0806; }
-::-webkit-scrollbar-thumb { background: var(--ex-line); border: 2px solid #0b0806; border-radius: 6px; }
+::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--ex-bg-2); }
+::-webkit-scrollbar-thumb { background: var(--ex-line); border: 2px solid var(--ex-bg-2); border-radius: 6px; }
 """
 
 
 # ---- per-league colours ---------------------------------------------------
-# One accent colour per league, picked to suit that league's theme; the rest of
-# the palette (borders, panel tint, glow, tabs) is worked out from it. Override
-# a league with "color: '#rrggbb'" on its line in leagues.yaml.
+# One accent colour per league; the rest of the palette (borders, panel tint,
+# glow, tabs) is worked out from it. Where it comes from, first match wins:
+#   1. color: '#rrggbb' on the league's line in leagues.yaml
+#   2. a logo saved in the data folder's league-logos folder (its main colour)
+#   3. the guesses below (not checked against the real logos)
 LEAGUE_COLORS = {
     "Affliction": "#5fb38a",              # Wildwood greens
     "Necropolis": "#9db36a",              # graveyard, pale sickly green
@@ -144,7 +146,7 @@ LEAGUE_COLORS = {
     "Secrets of the Atlas": "#6f9be0",    # starlit blue
     "Keepers of the Flame": "#e8913a",    # amber flame
     "Mirage": "#4fc2c2",                  # desert-mirage turquoise
-    "Curse of the Allflame": "#d4503e",   # crimson fire
+    "Curse of the Allflame": "#6dbb4a",   # green flame
 }
 DEFAULT_ACCENT = "#c9a35a"                # Exile gold
 
@@ -165,6 +167,49 @@ def _rgba(hex_: str, a: float) -> str:
     return f"rgba({int(hex_[1:3], 16)},{int(hex_[3:5], 16)},{int(hex_[5:7], 16)},{a})"
 
 
+_LOGO_CACHE: dict = {}
+
+
+def logo_accent(path) -> str | None:
+    """The main colour of a league logo image: the most common strongly coloured
+    hue, ignoring dark, washed-out and near-white pixels. Brought to a lightness
+    that reads well as an accent."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    import colorsys
+    key = (str(path), path.stat().st_mtime)
+    if key in _LOGO_CACHE:
+        return _LOGO_CACHE[key]
+    try:
+        im = Image.open(path).convert("RGBA")
+        im.thumbnail((96, 96))
+        bins: dict = {}
+        for r, g, b, a in im.getdata():
+            if a < 128:
+                continue
+            h, l, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+            if sat < 0.30 or l < 0.18 or l > 0.88:
+                continue
+            w = sat * (1 - abs(l - 0.5) * 1.4)
+            hb = int(h * 36) % 36
+            t = bins.setdefault(hb, [0.0, 0.0, 0.0, 0.0])
+            t[0] += w
+            t[1] += w * h
+            t[2] += w * sat
+            t[3] += w * l
+        if not bins:
+            out = None
+        else:
+            w, hs, ss, ls = max(bins.values(), key=lambda t: t[0])
+            out = _hex(hs / w, min(0.64, max(0.52, ls / w)), min(0.85, max(0.45, ss / w)))
+    except Exception:
+        out = None
+    _LOGO_CACHE[key] = out
+    return out
+
+
 def league_palette(accent: str | None) -> dict:
     """Every Exile-theme colour, derived from one accent colour."""
     accent = accent or DEFAULT_ACCENT
@@ -172,21 +217,23 @@ def league_palette(accent: str | None) -> dict:
     k = lambda m: min(1.0, s * m)
     return {
         "gold": accent,
-        "gold-hi": _hex(h, 0.76, k(1.55)),
-        "text": _hex(h, 0.79, k(0.80)),
-        "value": _hex(h, 0.85, k(1.35)),
-        "muted": _hex(h, 0.53, k(0.47)),
-        "dim": _hex(h, 0.41, k(0.38)),
-        "line": _hex(h, 0.21, k(0.74)),
-        "line-dim": _hex(h, 0.13, k(0.60)),
-        "panel": _hex(h, 0.063, k(0.60)),
-        "panel-2": _hex(h, 0.045, k(0.60)),
-        "glow": _hex(h, 0.096, k(0.85)),
-        "head": _hex(h, 0.075, k(0.73)),
-        "drawer": _hex(h, 0.053, k(0.65)),
-        "tab": _hex(h, 0.08, k(0.73)),
-        "tab-on": _hex(h, 0.16, k(0.90)),
-        "band": _rgba(_hex(h, 0.30, k(1.10)), .38),
+        "gold-hi": _hex(h, 0.78, k(1.55)),
+        "text": _hex(h, 0.87, k(0.55)),
+        "value": _hex(h, 0.90, k(1.20)),
+        "muted": _hex(h, 0.66, k(0.42)),
+        "dim": _hex(h, 0.56, k(0.30)),
+        "line": _hex(h, 0.30, k(0.60)),
+        "line-dim": _hex(h, 0.20, k(0.45)),
+        "panel": _hex(h, 0.115, k(0.45)),
+        "panel-2": _hex(h, 0.090, k(0.45)),
+        "bg": _hex(h, 0.075, k(0.40)),
+        "bg-2": _hex(h, 0.055, k(0.35)),
+        "glow": _hex(h, 0.16, k(0.75)),
+        "head": _hex(h, 0.115, k(0.55)),
+        "drawer": _hex(h, 0.095, k(0.45)),
+        "tab": _hex(h, 0.13, k(0.55)),
+        "tab-on": _hex(h, 0.24, k(0.75)),
+        "band": _rgba(_hex(h, 0.36, k(1.10)), .42),
         "cur": _hex(h + 0.5, 0.58, max(0.35, min(0.6, s))),   # the act in progress: the accent's opposite
         "a06": _rgba(accent, .06), "a10": _rgba(accent, .10), "a18": _rgba(accent, .18),
         "a20": _rgba(accent, .20), "a28": _rgba(accent, .28),

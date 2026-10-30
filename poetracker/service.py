@@ -162,6 +162,7 @@ class Tracker:
         self.progress = None
         self.clip: captures.ClipboardWatcher | None = None
         self.last_error = None
+        self.data_gen = 0          # bumps after a rebuild, so cached results from before are dropped
 
     def status(self) -> dict:
         size = None
@@ -180,7 +181,7 @@ class Tracker:
             "log_found": bool(self.log_path and self.log_path.exists()), "log_size": size, "log_offset": offset,
             "last_event_utc": st.get("last_ts"), "captures": caps,
             "clipboard": bool(self.clip and self.clip.is_alive()), "error": self.last_error,
-            "now_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "now_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "data_gen": self.data_gen,
         }
 
     def _progress(self, done, total):
@@ -270,6 +271,7 @@ class Tracker:
                 log.exception("rebuild failed")
             finally:
                 self.progress = None
+                self.data_gen += 1
                 self.phase = "live"
 
     def reload_config(self) -> None:

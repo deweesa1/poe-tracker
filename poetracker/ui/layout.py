@@ -57,7 +57,9 @@ class State:
     def con(self):
         return db.connect(readonly=True)
 
-    def version(self) -> tuple:
+    def version(self, league: str | None = None) -> tuple:
+        """What cached results depend on. A league that has ended can't get new
+        game data, so its results stay valid while you play (until a rebuild)."""
         st = self.tracker.status() if self.tracker else {}
         try:
             c = self.con()
@@ -65,10 +67,12 @@ class State:
             c.close()
         except Exception:
             n = (0, 0)
-        return (st.get("last_event_utc"), st.get("phase"), tuple(n))
+        if league and self.cfg and league != metrics.current_league(self.cfg):
+            return ("past", st.get("data_gen"), st.get("phase"), tuple(n))
+        return (st.get("last_event_utc"), st.get("data_gen"), st.get("phase"), tuple(n))
 
-    def cached(self, key: tuple, fn: Callable):
-        v = self.version()
+    def cached(self, key: tuple, fn: Callable, league: str | None = None):
+        v = self.version(league)
         with self._lock:
             hit = self._cache.get(key)
             if hit and hit[0] == v:
@@ -80,7 +84,7 @@ class State:
             con.close()
         with self._lock:
             self._cache[key] = (v, out)
-            if len(self._cache) > 200:
+            if len(self._cache) > 600:
                 self._cache.clear()
         return out
 
@@ -97,7 +101,7 @@ class State:
         return lg if lg in names else (names[0] if names else None)
 
     def characters(self, league: str | None) -> list[dict]:
-        return self.cached(("chars", league), lambda c: metrics.own_characters(c, league))
+        return self.cached(("chars", league), lambda c: metrics.own_characters(c, league), league=league)
 
     def character(self, league: str | None) -> int | None:
         cid = self.pref("character")
@@ -165,7 +169,26 @@ def league_accent(league: str | None) -> str:
     if not league or not STATE.cfg.settings.get("league_colors", True):
         return DEFAULT_ACCENT
     own = (STATE.cfg.extra.get("league_colors") or {}).get(league)
-    return own or LEAGUE_COLORS.get(league) or DEFAULT_ACCENT
+    if own:
+        return own
+    logo = league_logo(league)
+    if logo:
+        from .widgets import logo_accent
+        picked = logo_accent(logo)
+        if picked:
+            return picked
+    return LEAGUE_COLORS.get(league) or DEFAULT_ACCENT
+
+
+def league_logo(league: str):
+    """A league logo you saved in the data folder's league-logos folder, named
+    after the league (any of png, jpg, jpeg, webp). Only its colours are used."""
+    folder = paths.data_dir() / "league-logos"
+    for ext in ("png", "jpg", "jpeg", "webp"):
+        p = folder / f"{league}.{ext}"
+        if p.exists():
+            return p
+    return None
 
 
 def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):

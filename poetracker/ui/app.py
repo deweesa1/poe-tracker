@@ -12,6 +12,22 @@ from .layout import STATE
 log = logging.getLogger(__name__)
 
 
+def _logos_folder() -> None:
+    folder = paths.data_dir() / "league-logos"
+    folder.mkdir(exist_ok=True)
+    readme = folder / "README.txt"
+    if not readme.exists():
+        readme.write_text(
+            "League colours from logos\n\n"
+            "Save a league's logo here, named exactly like the league, e.g.\n"
+            "  Curse of the Allflame.png\n"
+            "  Mirage.jpg\n"
+            "(png, jpg, jpeg or webp). The tracker picks the logo's main colour and themes\n"
+            "that league with it. The images are only read for their colours; they aren't\n"
+            "shown and never leave this folder. Restart the tracker after adding one.\n",
+            encoding="utf-8")
+
+
 def run(window: str | None = None, port: int | None = None) -> None:
     service.setup_logging()
     if not service.single_instance():
@@ -48,6 +64,8 @@ def run(window: str | None = None, port: int | None = None) -> None:
 
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))
     from . import pages  # noqa: F401  (registers the pages)
+    pages.start_warmup()
+    _logos_folder()
 
     window = window or cfg.settings.get("window") or "native"
     native = window == "native"
