@@ -37,9 +37,9 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-row b { color: var(--ex-text); font-weight: 600; }
 .m-h { font-family: 'Cinzel', serif; font-weight: 600; font-size: 10.5px; letter-spacing: .08em; color: var(--ex-gold);
   margin: 9px 0 3px; border-bottom: 1px solid var(--ex-line-dim); padding-bottom: 2px; }
-.m-splits { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+.m-splits { display: flex; flex-direction: column; }
 .m-split { display: flex; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.55; white-space: nowrap; }
-.m-split .a { width: 24px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
+.m-split .a { width: 30px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
 .m-split.cur .a, .m-split.cur .t { color: var(--ex-gold-hi); } .m-split.todo { color: var(--ex-dim); }
 .m-labs { display: flex; gap: 10px; font-size: 12px; margin-top: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .m-labs span { color: var(--ex-muted); } .m-labs b { color: var(--ex-text); font-weight: 600; }
@@ -50,7 +50,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-btns .x { display: none; } .mini.unlocked .m-btns .x { display: inline; }
 .m-top { padding-right: 64px; }
 .mini.collapsed .m-hide, .mini.collapsed .m-foot, .mini.collapsed .m-grip { display: none !important; }
-.mini.collapsed .m-clock { margin-top: 0; padding-right: 64px; }
+.mini.collapsed .m-row { margin-bottom: 0; }
 .m-next { font-size: 12.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-next .k { color: var(--ex-muted); display: inline-block; width: 44px; }
 .m-bar { display: flex; gap: 2px; height: 16px; margin-top: 7px; }
@@ -184,7 +184,7 @@ def render(d: dict, live: bool) -> str:
         return '<div class="m-top"><span class="m-lg">PoE Tracker</span></div><div class="m-dim">No league has started yet.</div>'
     if d.get("view") == "campaign":
         c = d.get("campaign")
-        head = (f'<div class="m-top m-hide"><span class="m-lg">{_esc(c["character"]) if c else "Campaign"}</span>'
+        head = (f'<div class="m-top"><span class="m-lg">{_esc(c["character"]) if c else "Campaign"}</span>'
                 f'<span class="ch">{_esc(d["league"])}</span></div>')
         if not c:
             return head + '<div class="m-dim">Waiting for your first character. The timer starts in The Twilight Strand.</div>'
@@ -211,7 +211,7 @@ def render(d: dict, live: bool) -> str:
                         f'<span class="t">{_ticker(c["play_s"], c["anchor_utc"], on)}</span>'
                         f'<span class="d">{_ticker(c["act_s"], c["anchor_utc"], on) if c["act_s"] is not None else ""}</span></div>')
             return f'<div class="m-split todo"><span class="a">A{a}</span><span class="t">–</span></div>'
-        splits = ('<div class="m-splits">' + "".join(cell(a) + cell(a + 5) for a in range(1, 6)) + '</div>')
+        splits = '<div class="m-splits">' + "".join(cell(a) for a in range(1, 11)) + '</div>'
         labs = "".join(f'<span>{_esc(l["lab"])} <b>{fmt.clock(l["split"]) if l["done"] else "–"}</b></span>'
                        for l in c.get("labs") or [])
         nb, nt = c.get("next_boss"), c.get("next_trial")
@@ -223,8 +223,8 @@ def render(d: dict, live: bool) -> str:
             nxt += f'<div class="m-next"><span class="k">Trial</span>{_esc(nt["lab"])} · {_esc(nt["zone"])}</div>'
         return (head
                 + f'<div class="m-clock">{_ticker(c["play_s"], c["anchor_utc"], on)}</div>'
-                + f'<div class="m-where m-hide">{where}</div>'
-                + f'<div class="m-row m-hide" data-p="4"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
+                + f'<div class="m-where">{where}</div>'
+                + f'<div class="m-row" data-p="4"><span>Lv <b>{c["level"]}</b></span><span>Deaths <b>{c["deaths"]}</b></span>'
                   f'<span>Quest pts <b>{c["quest_points"]}/{c["quest_total"]}</b></span></div>'
                 + bar
                 + f'<div class="m-hide" data-p="2"><div class="m-h">SPLITS</div>{splits}'
@@ -247,12 +247,12 @@ def render(d: dict, live: bool) -> str:
 
     def rate(v):
         return "–" if v is None else fmt.num(v, 1)
-    return (f'<div class="m-top m-hide"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span>'
+    return (f'<div class="m-top"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span>'
             f'<span class="ch">{_esc(d["league"])}</span></div>'
             f'<div class="m-clock">{clock}</div>'
-            + (f'<div class="m-where m-hide">League start finished {fmt.when(m["ended"])}{tier}</div>' if m.get("ended") else
-               f'<div class="m-where m-hide">{phase} · {_esc(m.get("zone") or "")}{tier}</div>') +
-            f'<div class="m-row m-hide"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
+            + (f'<div class="m-where">League start finished {fmt.when(m["ended"])}{tier}</div>' if m.get("ended") else
+               f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}{tier}</div>') +
+            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
             + bar +
             f'<div class="m-row m-hide" data-p="3" style="margin-top:7px">{stones}</div>'
