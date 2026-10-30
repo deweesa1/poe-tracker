@@ -28,7 +28,8 @@ def main(argv=None) -> int:
     r.add_argument("--port", type=int)
     r.add_argument("--dev", action="store_true", help="developer mode: force League Start to any league and phase")
     sub.add_parser("mini", help="open the always-on-top mini tracker (the tracker must be running)")
-    sub.add_parser("restart", help="(used by updates) wait for the tracker to close, then start it again")
+    rs = sub.add_parser("restart", help="(used by updates) wait for the tracker to close, then start it again")
+    rs.add_argument("again", nargs=argparse.REMAINDER, help="how to start it again (e.g. run --dev)")
     sub.add_parser("ingest")
     rb = sub.add_parser("rebuild")
     rb.add_argument("--from-log", action="store_true", help="re-read Client.txt from the start")
@@ -43,7 +44,7 @@ def main(argv=None) -> int:
 
     if args.cmd == "restart":
         from .updater import run_restart
-        return run_restart()
+        return run_restart(args.again)
 
     if args.cmd in (None, "run"):
         from .ui.app import run

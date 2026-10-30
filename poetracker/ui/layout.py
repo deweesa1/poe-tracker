@@ -266,6 +266,8 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     lbl.tooltip(tip)
                 ui.button(icon="picture_in_picture_alt", on_click=open_mini).props(
                     "flat round dense size=sm").tooltip("Open the mini tracker (always on top)")
+                if STATE.updater:
+                    STATE.updater.check_soon()          # while the window is open, at most every 90 s
                 up = STATE.updater.state if STATE.updater else {}
                 if up.get("available"):
                     ui.button(f"Update available ({up['behind']})", icon="system_update",
@@ -292,7 +294,9 @@ def update_dialog() -> None:
     from nicegui import app, run
     from .. import updater as updater_mod
     up = STATE.updater.state
-    with ui.dialog() as dlg, ui.card().classes("pt-card").style("min-width:min(520px, 92vw)"):
+    # The dialog lives on the page itself, not inside the status bar (which is
+    # redrawn every few seconds and would delete it mid-update).
+    with ui.context.client.content, ui.dialog() as dlg, ui.card().classes("pt-card").style("min-width:min(520px, 92vw)"):
         ui.label("Update Available").classes("pt-h2")
         ui.label(f"{up['behind']} change{'s' if up['behind'] != 1 else ''} since your version "
                  f"({up.get('version') or '?'}):").classes("pt-sub")

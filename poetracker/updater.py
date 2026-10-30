@@ -103,7 +103,14 @@ class Updater:
         self.state["version"] = self.version()
         return True, "Connected to GitHub."
 
-    def start_background(self, every_minutes: float = 5) -> None:
+    def check_soon(self, older_than: float = 90) -> None:
+        """Check in the background if the last check is older than this (seconds)."""
+        st = self.state
+        if st.get("busy") or self.lock.locked() or (st.get("checked") and time.time() - st["checked"] < older_than):
+            return
+        threading.Thread(target=self.check, daemon=True, name="update-check").start()
+
+    def start_background(self, every_minutes: float = 2) -> None:
         def loop():
             time.sleep(20)               # let the tracker finish starting first
             while True:
@@ -121,13 +128,14 @@ def restart_app() -> None:
     copy to let go of the database, installs any new Python packages quietly,
     then opens the tracker again."""
     exe = _windowless_python()
+    again = [a for a in sys.argv[1:] if a in ("run", "--dev", "--browser")]   # reopen the same way (e.g. dev mode)
     if sys.platform == "win32":
-        subprocess.Popen([exe, "-m", "poetracker", "restart"], cwd=PROJECT_DIR,
+        subprocess.Popen([exe, "-m", "poetracker", "restart", *again], cwd=PROJECT_DIR,
                          creationflags=_NO_WINDOW | 0x00000008 | 0x00000200,   # no window, detached, own group
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          close_fds=True)
     else:
-        subprocess.Popen([exe, "-m", "poetracker", "restart"], cwd=PROJECT_DIR, start_new_session=True,
+        subprocess.Popen([exe, "-m", "poetracker", "restart", *again], cwd=PROJECT_DIR, start_new_session=True,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -147,7 +155,7 @@ def _console_python() -> str:
     return str(exe)
 
 
-def run_restart(wait: float = 60.0) -> int:
+def run_restart(args: list[str] | None = None, wait: float = 60.0) -> int:
     """The hidden helper behind restart_app()."""
     from . import service
     service.setup_logging()
@@ -167,8 +175,15 @@ def run_restart(wait: float = 60.0) -> int:
                 log.warning("restart: pip install failed: %s", (r.stderr or r.stdout)[-800:])
         except Exception:
             log.exception("restart: pip install failed")
-    # 3. open the tracker again
-    subprocess.Popen([_windowless_python(), "-m", "poetracker"], cwd=PROJECT_DIR,
+    # 3. open the tracker again, the way it was started. Dev mode gets its log
+    # window back (a new console), the normal tracker none.
+    args = [a for a in (args or []) if a in ("run", "--dev", "--browser")]
+    if "--dev" in args and sys.platform == "win32":
+        subprocess.Popen(["cmd", "/c", "title PoE Tracker (dev) & " + subprocess.list2cmdline(
+                              [_console_python(), "-m", "poetracker", *args]) + " & pause"],
+                         cwd=PROJECT_DIR, creationflags=0x00000010)        # CREATE_NEW_CONSOLE
+        return 0
+    subprocess.Popen([_windowless_python(), "-m", "poetracker", *args], cwd=PROJECT_DIR,
                      creationflags=(_NO_WINDOW | 0x00000008) if sys.platform == "win32" else 0,
                      start_new_session=sys.platform != "win32",
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
