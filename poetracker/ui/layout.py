@@ -220,6 +220,12 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                 lbl = ui.label(text)
                 if tip:
                     lbl.tooltip(tip)
+                def open_mini():
+                    from .. import mini as mini_mod
+                    mini_mod.launch_mini()
+                    ui.notify("Opening the mini tracker… Ctrl+Shift+F9 locks it (clicks pass through to the game).")
+                ui.button(icon="picture_in_picture_alt", on_click=open_mini).props(
+                    "flat round dense size=sm").tooltip("Open the mini tracker (always on top)")
                 up = STATE.updater.state if STATE.updater else {}
                 if up.get("available"):
                     ui.button(f"Update available ({up['behind']})", icon="system_update",

@@ -48,6 +48,7 @@ def run(window: str | None = None, port: int | None = None) -> None:
 
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))
     from . import pages  # noqa: F401  (registers the pages)
+    from . import mini_page  # noqa: F401  (the mini window's page)
     pages.start_warmup()
 
     window = window or cfg.settings.get("window") or "native"
@@ -66,6 +67,12 @@ def run(window: str | None = None, port: int | None = None) -> None:
     if native:
         from nicegui import native as ng_native
         kwargs["port"] = port or ng_native.find_open_port()
+    # the mini tracker finds the dashboard through this file
+    from .. import mini as mini_mod
+    mini_mod.write_port(kwargs["port"])
+    if cfg.settings.get("mini_on_start") and window != "headless":
+        app.on_startup(lambda: mini_mod.launch_mini())
+    if native:
         ui.run(native=True, window_size=(1500, 950), **kwargs)
     else:
         ui.run(show=bool(cfg.settings.get("open_browser", True)) and window != "headless", **kwargs)

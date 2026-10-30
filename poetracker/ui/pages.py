@@ -1409,6 +1409,44 @@ def settings_page():
             lgs = list(reversed(STATE.cfg.leagues))[:4]
             ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
                 "pt-note q-mt-sm")
+        with card("Mini Tracker"):
+            ui.label("A small always-on-top window with your live campaign timer, splits, next boss and trial "
+                     "(or Voidstones and next milestones while mapping). Use the game in windowed or borderless "
+                     "fullscreen so it can sit over it.").classes("pt-sub")
+            hk = s.get("mini_hotkey", "ctrl+shift+f9")
+            ui.label(f"Locked: clicks pass straight through to the game and it never takes focus. Unlocked: drag it, "
+                     f"resize it from the edges, or close it. Switch with {hk.upper().replace('+', ' + ')}.").classes("pt-note")
+
+            def open_mini():
+                from .. import mini as mini_mod
+                mini_mod.launch_mini()
+                ui.notify("Opening the mini tracker…")
+
+            def save_mini():
+                from .. import mini as mini_mod
+                if not mini_mod.parse_hotkey(hk_in.value or ""):
+                    ui.notify("Hotkey like ctrl+shift+f9 (ctrl/alt/shift/win + a letter, number or F1-F12).", type="warning")
+                    return
+                config_mod.save_settings({"mini_on_start": bool(on_start.value), "mini_opacity": round(op.value / 100, 2),
+                                          "mini_hotkey": (hk_in.value or "").strip().lower()})
+                STATE.cfg.settings.update(mini_on_start=bool(on_start.value), mini_opacity=round(op.value / 100, 2),
+                                          mini_hotkey=(hk_in.value or "").strip().lower())
+                ui.notify("Saved. Close and reopen the mini tracker to use the new settings.", type="positive")
+
+            def reset_pos():
+                from .. import paths as paths_mod
+                (paths_mod.data_dir() / "mini.json").unlink(missing_ok=True)
+                ui.notify("Position reset. It opens in the default spot next time.")
+            with ui.row().classes("items-center gap-4 q-mt-sm w-full"):
+                on_start = ui.switch("Open with the tracker", value=bool(s.get("mini_on_start", False)))
+                hk_in = ui.input("Lock hotkey", value=hk).props("outlined dense dark").style("max-width:170px")
+                with ui.column().classes("gap-0").style("min-width:200px"):
+                    ui.label("See-through").classes("pt-note")
+                    op = ui.slider(min=40, max=100, step=5, value=int(float(s.get("mini_opacity", 0.92)) * 100)).props("label")
+            with ui.row().classes("items-center gap-3"):
+                ui.button("Open mini tracker", icon="picture_in_picture_alt", on_click=open_mini).props("unelevated")
+                ui.button("Save", on_click=save_mini).props("outline")
+                ui.button("Reset position", on_click=reset_pos).props("flat")
         with card("Updates"):
             from nicegui import run as ng_run
             upd = STATE.updater

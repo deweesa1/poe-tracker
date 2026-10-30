@@ -1,6 +1,7 @@
 """Command line: python -m poetracker [command]
 
     run       (default) start the tracker and open the dashboard window
+    mini      open the small always-on-top tracker window
               --browser  open it in your web browser instead
     ingest    read new lines from Client.txt once and exit
     rebuild   rebuild all derived tables (add --from-log to re-read Client.txt)
@@ -24,6 +25,7 @@ def main(argv=None) -> int:
     r.add_argument("--browser", action="store_true", help="open in the web browser instead of its own window")
     r.add_argument("--headless", action="store_true", help="don't open anything (for testing)")
     r.add_argument("--port", type=int)
+    sub.add_parser("mini", help="open the always-on-top mini tracker (the tracker must be running)")
     sub.add_parser("ingest")
     rb = sub.add_parser("rebuild")
     rb.add_argument("--from-log", action="store_true", help="re-read Client.txt from the start")
@@ -31,6 +33,10 @@ def main(argv=None) -> int:
     cp = sub.add_parser("capture")
     cp.add_argument("file")
     args = ap.parse_args(argv)
+
+    if args.cmd == "mini":
+        from .mini import run_mini
+        return run_mini()
 
     if args.cmd in (None, "run"):
         from .ui.app import run

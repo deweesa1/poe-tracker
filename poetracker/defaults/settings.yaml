@@ -47,3 +47,8 @@ theme: exile
 # Check github.com/deweesa1/poe-tracker for a newer version every 30 minutes.
 update_check: true
 update_repo: https://github.com/deweesa1/poe-tracker.git
+
+# Mini tracker (always-on-top window).
+mini_on_start: false        # open it whenever the tracker starts
+mini_hotkey: ctrl+shift+f9  # lock/unlock: locked = clicks pass through to the game
+mini_opacity: 0.92          # 0.4 (very see-through) to 1.0 (solid)

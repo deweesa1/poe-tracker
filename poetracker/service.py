@@ -108,7 +108,7 @@ def daily_backup(keep: int = 7) -> Path | None:
 _LOCK_HANDLE = None
 
 
-def single_instance(wait: float = 8.0) -> bool:
+def single_instance(wait: float = 8.0, name: str = "tracker.lock") -> bool:
     """Take an exclusive lock on tracker.lock in the data folder. Returns False
     when another copy of the tracker still holds it after `wait` seconds (two
     copies writing the same database at once corrupts it). The short wait lets
@@ -116,7 +116,7 @@ def single_instance(wait: float = 8.0) -> bool:
     global _LOCK_HANDLE
     deadline = time.time() + wait
     while True:
-        f = open(paths.data_dir() / "tracker.lock", "a+")
+        f = open(paths.data_dir() / name, "a+")
         try:
             if sys.platform == "win32":
                 import msvcrt
@@ -131,7 +131,8 @@ def single_instance(wait: float = 8.0) -> bool:
                 return False
             time.sleep(0.5)
             continue
-        _LOCK_HANDLE = f          # keep it open (and locked) for the life of the process
+        globals().setdefault("_LOCKS", []).append(f)   # keep it open (and locked) for the life of the process
+        _LOCK_HANDLE = f
         return True
 
 

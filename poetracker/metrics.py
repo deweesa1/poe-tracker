@@ -1394,3 +1394,67 @@ def mapping_progress(con, config: Config, league: str) -> dict:
             "days": _secs(lg_start, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")) / 86400 if lg_start else None,
         },
     }
+
+
+# ---------------------------------------------------------------- mini window
+
+def mini_status(con, config: Config, league: str | None = None) -> dict:
+    """Everything the always-on-top mini window shows, for the league being
+    started (campaign or mapping phase) or the latest league."""
+    status = league_start_status(con, config, league)
+    lg = status["league"]
+    out: dict = {"league": lg, "phase": status["phase"], "voidstones": status.get("voidstones"),
+                 "voidstones_total": status.get("voidstones_total", 4)}
+    if not lg:
+        return out
+    cid = status.get("starter")
+    if status["phase"] == "campaign" or (status["phase"] != "mapping" and not status.get("mapping_char")):
+        out["view"] = "campaign"
+        if not cid:
+            return out
+        sp = campaign_splits(con, cid)
+        if not sp:
+            return out
+        last = con.execute("""SELECT v.start_utc, v.end_utc, v.area_name, v.kind, v.session_id FROM area_visit v
+                              WHERE v.character_id=? ORDER BY v.start_utc DESC LIMIT 1""", (cid,)).fetchone()
+        afk = con.execute("SELECT 1 FROM afk_period WHERE session_id=? AND end_utc IS NULL LIMIT 1",
+                          (last["session_id"],)).fetchone() if last else None
+        acts = sp["acts"]
+        cur = next((a for a in acts if not a["finished"]), None)
+        done = [a for a in acts if a["finished"]]
+        nxt_boss = next((b for b in sp["bosses"] if not b["done"]), None)
+        nxt_trial = next((t for t in sp["trials"] if not t["done"]), None)
+        open_visit = bool(last and last["end_utc"] is None and not sp["completed"])
+        out["campaign"] = {
+            "character": sp["character"], "class": sp["class"], "completed": sp["completed"],
+            "play_s": sp["play_s"], "anchor_utc": last["start_utc"] if open_visit else None,
+            "afk": bool(afk), "zone": last["area_name"] if last else None,
+            "act": cur["act"] if cur else (acts[-1]["act"] if acts else None),
+            "act_s": cur["time_s"] if cur else None,
+            "level": sp["level_end"], "deaths": sp["deaths"], "progress": sp["progress"],
+            "splits": [{"act": a["act"], "split": a["split"], "time_s": a["time_s"]} for a in done[-4:]],
+            "next_boss": {"boss": nxt_boss["boss"], "act": nxt_boss["act"],
+                          "zone": next((z for (_, b_, z, _p) in CAMPAIGN_BOSSES if b_ == nxt_boss["boss"]), None)}
+                         if nxt_boss else None,
+            "next_trial": {"lab": nxt_trial["lab"], "zone": nxt_trial["zone"], "act": nxt_trial["act"]} if nxt_trial else None,
+            "trials": sum(1 for t in sp["trials"] if t["done"]),
+            "quest_points": sp["passives"]["got"], "quest_total": sp["passives"]["total"],
+        }
+        # area id -> name for the next boss's zone
+        if out["campaign"]["next_boss"] and out["campaign"]["next_boss"]["zone"]:
+            r = con.execute("SELECT area_name FROM area_visit WHERE area_id=? AND area_name IS NOT NULL LIMIT 1",
+                            (out["campaign"]["next_boss"]["zone"],)).fetchone()
+            out["campaign"]["next_boss"]["zone"] = r[0] if r else None
+        return out
+    # mapping (or league start finished): the mapping character's endgame
+    out["view"] = "mapping"
+    m = mapping_progress(con, config, lg)
+    k = m["kpis"]
+    nxt = [x for x in m["milestones"] if not x["done"] and not x.get("voidstone")][:3]
+    out["mapping"] = {
+        "character": m.get("character"), "top_tier": k.get("top_tier"), "maps": k.get("maps"),
+        "voidstones": k.get("voidstones"), "voidstones_total": k.get("voidstones_total"),
+        "level": k.get("level"), "mapping_s": k.get("mapping_played_s"), "deaths": k.get("map_deaths"),
+        "next": [{"group": x["group"], "name": x["name"]} for x in nxt],
+    }
+    return out
