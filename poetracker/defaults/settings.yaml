@@ -44,8 +44,8 @@ league_start_mode: true
 
 # Look of the dashboard: exile (Path of Exile style) or classic.
 theme: exile
-# Exile look: give each league its own accent colour (see leagues.yaml to change one).
-league_colors: true
+# Exile look, each league's own colour: subtle (a few highlights), full (the whole app) or off.
+league_colors: subtle
 # Check github.com/deweesa1/poe-tracker for a newer version every 30 minutes.
 update_check: true
 update_repo: https://github.com/deweesa1/poe-tracker.git

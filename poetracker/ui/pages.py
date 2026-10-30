@@ -184,7 +184,7 @@ def voidstone_section(lg: str) -> None:
                 "display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(max(220px, calc((100% - 36px) / 4)), 1fr))"):
             for s in v["voidstones"]:
                 got = s["obtained"]
-                border = "#7cb36b" if got else LINE_C
+                border = "var(--lg, #7cb36b)" if got else LINE_C
                 with ui.element("div").classes("pt-kpi").style(f"border-color:{border}"):
                     if got:
                         status = (f'<span class="pt-up">{"Likely obtained" if s["likely"] else "Obtained"}</span> · '
@@ -588,7 +588,7 @@ def campaign_page():
                         ui.html(
                             f'<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px">'
                             f'<span style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums">{fmt.clock(sp["play_s"])}</span>'
-                            f'<span style="font-size:20px;color:var(--ex-gold, #d9a441);font-weight:600">{pct * 100:.0f}%</span>'
+                            f'<span style="font-size:20px;color:var(--lg, #d9a441);font-weight:600">{pct * 100:.0f}%</span>'
                             f'<span class="pt-note" style="font-size:14px">{status}</span></div>').classes("w-full")
                         # One bar for both: acts you haven't finished share the width equally;
                         # each finished act resizes to the time it took (relative to your
@@ -599,10 +599,10 @@ def campaign_page():
                         for n in range(1, 11):
                             a = acts.get(n)
                             if a and a["finished"]:
-                                grow, fill, bg = max(a["time_s"] / ref, 0.45), 1.0, "var(--ex-gold, #d9a441)"
+                                grow, fill, bg = max(a["time_s"] / ref, 0.45), 1.0, "var(--lg, #d9a441)"
                                 sub, tip = fmt.dur(a["time_s"], True), f"Act {n}: {fmt.clock(a['time_s'])}"
                             elif a:
-                                grow, fill, bg = max((a["time_s"] or 0) / ref, 1.0) if done_t else 1.0, a["progress"], "var(--ex-cur, #4fb3a5)"
+                                grow, fill, bg = max((a["time_s"] or 0) / ref, 1.0) if done_t else 1.0, a["progress"], "var(--lg-cur, #4fb3a5)"
                                 sub, tip = f"{a['progress'] * 100:.0f}%", f"Act {n}: in progress, {a['progress'] * 100:.0f}% of zones"
                             else:
                                 grow, fill, bg = 1.0, 0.0, "#4fb3a5"
@@ -1321,12 +1321,14 @@ def settings_page():
                               label="Look", on_change=set_theme).props("outlined dense dark").style("min-width:240px")
 
                     def set_lc(e):
-                        config_mod.save_settings({"league_colors": bool(e.value)})
-                        STATE.cfg.settings["league_colors"] = bool(e.value)
+                        config_mod.save_settings({"league_colors": e.value})
+                        STATE.cfg.settings["league_colors"] = e.value
                         _reload()
-                    ui.switch("Colours per league", value=bool(s.get("league_colors", True)), on_change=set_lc).tooltip(
-                        "Exile look only: each league gets its own accent colour. Change one with color: '#rrggbb' "
-                        "on its line in leagues.yaml.")
+                    from .layout import league_color_mode
+                    ui.select({"subtle": "Subtle: highlights only", "full": "Full: the whole app", "off": "Off: Exile gold"},
+                              value=league_color_mode(), label="League colours", on_change=set_lc).props(
+                        "outlined dense dark").style("min-width:230px").tooltip(
+                        "Each league's own colour (from its logo in the league-logos folder, or color: in leagues.yaml).")
 
                 def save():
                     config_mod.save_settings({

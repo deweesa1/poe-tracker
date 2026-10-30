@@ -163,10 +163,20 @@ def status_text() -> tuple[str, str, str]:
             "something the tracker uses (entering an area, a level-up, a death...).")
 
 
+def league_color_mode() -> str:
+    """subtle (league colour on a few highlights), full (whole app) or off."""
+    v = STATE.cfg.settings.get("league_colors", "subtle") if STATE.cfg else "subtle"
+    if v is True:
+        return "subtle"
+    if v is False or v is None:
+        return "off"
+    return v if v in ("subtle", "full", "off") else "subtle"
+
+
 def league_accent(league: str | None) -> str:
-    """The accent colour for a league: leagues.yaml 'color', else the built-in
-    pick, else Exile gold. Off when the setting league_colors is false."""
-    if not league or not STATE.cfg.settings.get("league_colors", True):
+    """The accent colour for a league: leagues.yaml 'color', else its saved
+    logo, else the built-in pick, else Exile gold."""
+    if not league or league_color_mode() == "off":
         return DEFAULT_ACCENT
     own = (STATE.cfg.extra.get("league_colors") or {}).get(league)
     if own:
@@ -195,18 +205,20 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
     """Draw the shared layout. Returns the content column to fill."""
     ui.add_css(CSS)
     exile = (STATE.cfg.settings.get("theme") if STATE.cfg else "exile") != "classic"
-    accent = "#d9a441"
+    primary = "#d9a441"
     if exile:
         ui.add_css(EXILE_CSS)
         accent = league_accent(STATE.league()) if STATE.cfg else DEFAULT_ACCENT
-        ui.add_css(league_css(accent))
+        mode = league_color_mode()
+        ui.add_css(league_css(accent, full=(mode == "full")))
+        primary = accent if mode == "full" else DEFAULT_ACCENT
     ui.dark_mode(True)
-    ui.colors(primary=accent, secondary="#4fb3a5", accent="#a68bd6", dark="#1d1916", dark_page="#14110f")
+    ui.colors(primary=primary, secondary="#4fb3a5", accent="#a68bd6", dark="#1d1916", dark_page="#14110f")
 
     with ui.left_drawer(value=True, fixed=True).props("width=252 bordered breakpoint=700").classes("q-pa-none"):
         with ui.row().classes("items-center gap-3 q-px-md q-pt-lg q-pb-md"):
-            ui.html('<div style="width:14px;height:14px;background:var(--ex-gold, #d9a441);transform:rotate(45deg);border-radius:2px;'
-                    'box-shadow:0 0 12px var(--ex-a28, rgba(217,164,65,.5))"></div>')
+            ui.html('<div style="width:14px;height:14px;background:var(--lg, #d9a441);transform:rotate(45deg);border-radius:2px;'
+                    'box-shadow:0 0 12px var(--lg-a50, rgba(217,164,65,.5))"></div>')
             ui.label("PoE Tracker").classes("text-weight-bold")
         ls = league_start()
         with ui.list().classes("pt-nav w-full"):

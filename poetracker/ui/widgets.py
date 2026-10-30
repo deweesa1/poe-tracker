@@ -125,7 +125,11 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .q-btn { font-family: 'Cinzel', serif; letter-spacing: .05em; }
 .q-field__label, .q-field__native, .q-select__dropdown-icon { color: var(--ex-text) !important; }
 .q-field--outlined .q-field__control:before { border-color: var(--ex-line) !important; }
-.pt-ls-name { font-family: 'Cinzel', serif; letter-spacing: .03em; color: var(--ex-gold-hi); }
+.pt-ls-name { font-family: 'Cinzel', serif; letter-spacing: .03em; color: var(--lg-hi, var(--ex-gold-hi));
+  text-shadow: 0 0 18px var(--lg-a28, transparent); }
+.q-header { border-bottom: 2px solid var(--lg, var(--ex-line)) !important; }
+.pt-nav .q-item.active { border-left-color: var(--lg, var(--ex-gold)) !important; }
+.q-tab--active { box-shadow: inset 0 2px 0 var(--lg, var(--ex-gold)); }
 .pt-zone-head { font-family: 'Cinzel', serif; letter-spacing: .04em; }
 ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--ex-bg-2); }
 ::-webkit-scrollbar-thumb { background: var(--ex-line); border: 2px solid var(--ex-bg-2); border-radius: 6px; }
@@ -240,9 +244,17 @@ def league_palette(accent: str | None) -> dict:
     }
 
 
-def league_css(accent: str | None) -> str:
-    pal = league_palette(accent)
-    return ":root { " + " ".join(f"--ex-{k}: {v};" for k, v in pal.items()) + " }"
+def league_css(accent: str | None, full: bool = False) -> str:
+    """CSS variables for the Exile look. full=True: the whole app takes the
+    league's colour. Otherwise the app stays Exile gold and only the --lg
+    highlights (league name, header line, logo, active markers, progress bar,
+    finished Voidstones) use the league colour."""
+    lg = league_palette(accent)
+    base = lg if full else league_palette(None)
+    vars_ = {f"--ex-{k}": v for k, v in base.items()}
+    vars_.update({"--lg": lg["gold"], "--lg-hi": lg["gold-hi"], "--lg-cur": lg["cur"],
+                  "--lg-a28": lg["a28"], "--lg-a50": _rgba(lg["gold"], .5)})
+    return ":root { " + " ".join(f"{k}: {v};" for k, v in vars_.items()) + " }"
 
 
 def kpi(label: str, value: str, detail: str = "", tooltip: str | None = None) -> None:
