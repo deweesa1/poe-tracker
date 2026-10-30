@@ -1384,16 +1384,106 @@ def mapping_progress(con, config: Config, league: str) -> dict:
 
     total_played = cum[-1] if cum else 0.0
     camp_played = played_at(status["campaign_end"]) if status["campaign_end"] else None
+
+    # ---- since entering maps: the first map this character ran
+    first = runs_[0] if runs_ else None
+    entered = None
+    rates = {"maps_per_h": None, "tiers_per_h": None, "levels_per_h": None, "deaths_per_h": None}
+    bar = []
+    if first:
+        e_ts = first["start_utc"]
+        e_played = played_at(e_ts)
+        map_s = max(total_played - e_played, 0.0)
+        lvl_in = level_at(mchar, e_ts)
+        lvl_now = level_at(mchar, None)
+        deaths_since = con.execute("SELECT COUNT(*) FROM death WHERE character_id=? AND ts_utc>=?", (mchar, e_ts)).fetchone()[0]
+        entered = {"ts_utc": e_ts, "tier": first["tier"], "area": first["area_name"],
+                   "after_launch_s": _secs(lg_start, e_ts) if lg_start else None, "level": lvl_in,
+                   "played_s": map_s}
+        # tiers: when each was first reached, on this character's play clock
+        reach = {}
+        for r in runs_:
+            t_ = min(r["tier"] or 0, 16)        # Nightmare (T17) maps count as the top of the climb
+            if t_ and t_ not in reach:
+                reach[t_] = played_at(r["start_utc"])
+        hours = map_s / 3600 if map_s >= 600 else None        # under 10 minutes the rates are noise
+        top_t = max(reach) if reach else None
+        if hours:
+            rates["maps_per_h"] = len(runs_) / hours
+            rates["levels_per_h"] = ((lvl_now or 0) - (lvl_in or 0)) / hours if lvl_in and lvl_now else None
+            rates["deaths_per_h"] = deaths_since / hours
+        # tier pace: tiers climbed up to the moment the highest tier was first reached
+        # (so it doesn't sag while you farm T16s afterwards)
+        if top_t and first["tier"] and top_t > first["tier"]:
+            climb_s = reach[top_t] - e_played
+            if climb_s > 0:
+                rates["tiers_per_h"] = (top_t - first["tier"]) / (climb_s / 3600)
+        rates.update(climb_from=first["tier"], climb_to=top_t,
+                     climb_s=(reach[top_t] - e_played) if top_t else None,
+                     levels=((lvl_now or 0) - (lvl_in or 0)) if lvl_in and lvl_now else None, deaths=deaths_since,
+                     maps=len(runs_))
+        # progress bar T1-T16: how long you stayed at each tier before the next one
+        reached = sorted(reach)
+        for tier in range(1, 17):
+            if tier in reach:
+                nxt = next((x for x in reached if x > tier), None)
+                end = reach[nxt] if nxt else total_played
+                bar.append({"tier": tier, "state": "done" if nxt else "current", "time_s": max(end - reach[tier], 0.0)})
+            elif top_t and tier < top_t:
+                bar.append({"tier": tier, "state": "skipped", "time_s": None})
+            else:
+                bar.append({"tier": tier, "state": "pending", "time_s": None})
+
     return {
         "status": status, "milestones": ms, "tiers": tiers, "character_id": mchar, "character": names.get(mchar),
+        "entered": entered, "rates": rates, "bar": bar, "voidstones": vs,
         "kpis": {
             "voidstones": vs["obtained"], "voidstones_total": vs["total"], "top_tier": top or None,
             "maps": len(runs_), "map_deaths": sum(r["deaths"] for r in runs_),
-            "played_s": total_played, "mapping_played_s": total_played - camp_played if camp_played is not None else None,
+            "played_s": total_played,
+            "mapping_played_s": entered["played_s"] if entered else (total_played - camp_played if camp_played is not None else None),
             "level": max([level_at(c, None) for c in own] or [None]),
             "days": _secs(lg_start, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")) / 86400 if lg_start else None,
         },
     }
+
+
+def map_checklist(con, league: str, manual: dict | None = None) -> dict:
+    """Every Atlas map and unique map for the league, with the first time any of
+    your characters in the league ran it. `manual` is {map name: [done, ts]}
+    from ticking boxes by hand, which wins over the log."""
+    from .atlas_maps import ATLAS_POOLS, NOT_REGULAR, UNIQUE_MAPS
+    manual = manual or {}
+    rows = _rows(con, """
+        SELECT v.area_id, v.area_name, v.start_utc, c.name AS character, r.tier
+        FROM area_visit v JOIN v_own_character c ON c.id=v.character_id
+        LEFT JOIN run r ON r.id=v.run_id
+        WHERE c.league=? AND (v.area_id LIKE 'MapWorlds%' OR v.area_id LIKE 'Synthesis_Map%')
+        ORDER BY v.start_utc""", (league,))
+    first_by_id, first_by_name = {}, {}
+    for r in rows:
+        first_by_id.setdefault(r["area_id"], r)
+        if r["area_id"].startswith("MapWorlds") and not any(x in r["area_id"] for x in NOT_REGULAR):
+            first_by_name.setdefault(r["area_name"], r)
+    pool = ATLAS_POOLS.get(league)
+    names = sorted(set(pool or ()) | set(first_by_name))
+
+    def item(name, hit, extra=False):
+        m = manual.get(name)
+        if m is not None:
+            done, ts, how = bool(m[0]), (m[1] if m[0] else None), "manual"
+        else:
+            done, ts, how = bool(hit), hit["start_utc"] if hit else None, "log" if hit else None
+        return {"name": name, "done": done, "ts_utc": ts, "how": how, "ran_utc": hit["start_utc"] if hit else None,
+                "tier": hit["tier"] if hit else None, "character": hit["character"] if hit else None,
+                "extra": extra}
+    maps = [item(n, first_by_name.get(n), extra=bool(pool) and n not in pool) for n in names]
+    uniques = []
+    for name, ids in UNIQUE_MAPS:
+        hits = [first_by_id[i] for i in ids if i in first_by_id]
+        uniques.append(item(name, min(hits, key=lambda h: h["start_utc"]) if hits else None))
+    return {"maps": maps, "uniques": uniques, "has_pool": bool(pool),
+            "maps_done": sum(m["done"] for m in maps), "uniques_done": sum(u["done"] for u in uniques)}
 
 
 # ---------------------------------------------------------------- mini window
@@ -1451,10 +1541,22 @@ def mini_status(con, config: Config, league: str | None = None) -> dict:
     m = mapping_progress(con, config, lg)
     k = m["kpis"]
     nxt = [x for x in m["milestones"] if not x["done"] and not x.get("voidstone")][:3]
+    mc = m.get("character_id")
+    last = con.execute("""SELECT v.start_utc, v.end_utc, v.area_name, v.session_id FROM area_visit v
+                          WHERE v.character_id=? ORDER BY v.start_utc DESC LIMIT 1""", (mc,)).fetchone() if mc else None
+    afk = con.execute("SELECT 1 FROM afk_period WHERE session_id=? AND end_utc IS NULL LIMIT 1",
+                      (last["session_id"],)).fetchone() if last else None
+    rt = m.get("rates") or {}
     out["mapping"] = {
+        "anchor_utc": last["start_utc"] if last and last["end_utc"] is None and m.get("entered") else None,
+        "afk": bool(afk), "zone": last["area_name"] if last else None,
+        "maps_per_h": rt.get("maps_per_h"), "tiers_per_h": rt.get("tiers_per_h"),
+        "bar": [b["state"] for b in m.get("bar") or []],
+        "stones": [{"name": s["name"].replace(" Voidstone", ""), "done": s["obtained"]}
+                   for s in (m.get("voidstones") or {}).get("voidstones") or []],
         "character": m.get("character"), "top_tier": k.get("top_tier"), "maps": k.get("maps"),
         "voidstones": k.get("voidstones"), "voidstones_total": k.get("voidstones_total"),
-        "level": k.get("level"), "mapping_s": k.get("mapping_played_s"), "deaths": k.get("map_deaths"),
+        "level": k.get("level"), "mapping_s": k.get("mapping_played_s"), "deaths": rt.get("deaths", k.get("map_deaths")),
         "next": [{"group": x["group"], "name": x["name"]} for x in nxt],
     }
     return out

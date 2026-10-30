@@ -103,7 +103,7 @@ class Updater:
         self.state["version"] = self.version()
         return True, "Connected to GitHub."
 
-    def start_background(self, every_minutes: float = 30) -> None:
+    def start_background(self, every_minutes: float = 5) -> None:
         def loop():
             time.sleep(20)               # let the tracker finish starting first
             while True:
@@ -116,13 +116,60 @@ class Updater:
 
 
 def restart_app() -> None:
-    """Start a fresh copy of the tracker a moment after this one closes. Uses
-    Start PoE Tracker.bat when present, so new Python packages get installed."""
-    bat = PROJECT_DIR / "Start PoE Tracker.bat"
+    """Start a fresh copy of the tracker once this one has closed. Runs
+    `python -m poetracker restart` with no console window: it waits for this
+    copy to let go of the database, installs any new Python packages quietly,
+    then opens the tracker again."""
+    exe = _windowless_python()
     if sys.platform == "win32":
-        launch = f'start "" /min "{bat}"' if bat.exists() else f'start "" "{sys.executable}" -m poetracker'
-        subprocess.Popen(f'cmd /c ping -n 4 127.0.0.1 >nul & {launch}', cwd=PROJECT_DIR, shell=True,
-                         creationflags=_NO_WINDOW | 0x00000008)   # DETACHED_PROCESS
+        subprocess.Popen([exe, "-m", "poetracker", "restart"], cwd=PROJECT_DIR,
+                         creationflags=_NO_WINDOW | 0x00000008 | 0x00000200,   # no window, detached, own group
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         close_fds=True)
     else:
-        subprocess.Popen(["sh", "-c", f'sleep 3; "{sys.executable}" -m poetracker'], cwd=PROJECT_DIR,
-                         start_new_session=True)
+        subprocess.Popen([exe, "-m", "poetracker", "restart"], cwd=PROJECT_DIR, start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _windowless_python() -> str:
+    """pythonw.exe next to the running Python on Windows (no console), else this Python."""
+    exe = Path(sys.executable)
+    if sys.platform == "win32" and exe.name.lower() == "python.exe" and (exe.parent / "pythonw.exe").exists():
+        return str(exe.parent / "pythonw.exe")
+    return str(exe)
+
+
+def _console_python() -> str:
+    """python.exe for running pip (pip under pythonw can't report progress, but works too)."""
+    exe = Path(sys.executable)
+    if sys.platform == "win32" and exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").exists():
+        return str(exe.parent / "python.exe")
+    return str(exe)
+
+
+def run_restart(wait: float = 60.0) -> int:
+    """The hidden helper behind restart_app()."""
+    from . import service
+    service.setup_logging()
+    # 1. wait for the old tracker to close (it holds tracker.lock while running)
+    if not service.single_instance(wait=wait):
+        log.warning("restart: the old tracker didn't close within %ss", wait)
+        return 1
+    service.release_instance()
+    # 2. new packages, quietly (needs internet; a failure isn't fatal)
+    req = PROJECT_DIR / "requirements.txt"
+    if req.exists():
+        try:
+            r = subprocess.run([_console_python(), "-m", "pip", "install", "-q", "--disable-pip-version-check",
+                                "-r", str(req)], cwd=PROJECT_DIR, capture_output=True, text=True, timeout=600,
+                               creationflags=_NO_WINDOW)
+            if r.returncode:
+                log.warning("restart: pip install failed: %s", (r.stderr or r.stdout)[-800:])
+        except Exception:
+            log.exception("restart: pip install failed")
+    # 3. open the tracker again
+    subprocess.Popen([_windowless_python(), "-m", "poetracker"], cwd=PROJECT_DIR,
+                     creationflags=(_NO_WINDOW | 0x00000008) if sys.platform == "win32" else 0,
+                     start_new_session=sys.platform != "win32",
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0

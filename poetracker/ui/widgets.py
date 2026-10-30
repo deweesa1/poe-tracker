@@ -208,7 +208,8 @@ def kpis(items: list[tuple], min_width: int = 170, columns: int | None = None) -
     """A grid of KPI tiles that wraps evenly instead of stretching the last one.
     columns=N keeps exactly N per row (tiles shrink to fit)."""
     # columns=N: N per row when there's room; on narrow windows they wrap instead of squashing
-    cols = (f"repeat(auto-fill, minmax(max(150px, calc((100% - {columns - 1} * 12px) / {columns})), 1fr))"
+    floor = 150 if min_width == 170 else min_width
+    cols = (f"repeat(auto-fill, minmax(max({floor}px, calc((100% - {columns - 1} * 12px) / {columns})), 1fr))"
             if columns else f"repeat(auto-fill, minmax({min_width}px, 1fr))")
     with ui.element("div").classes("w-full pt-kpis").style(f"display:grid; gap:12px; grid-template-columns:{cols}"):
         for it in items:

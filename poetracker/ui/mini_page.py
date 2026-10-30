@@ -47,6 +47,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-bar div { flex: 1; background: var(--ex-line-dim); border-radius: 1px; position: relative; overflow: hidden; }
 .m-bar div i { position: absolute; inset: 0; background: var(--ex-gold); }
 .m-bar div i.cur { background: var(--ex-cur); }
+.m-bar div i.skip { background: var(--ex-line); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
 .m-foot { position: fixed; left: 12px; right: 12px; bottom: 6px; font-size: 10.5px; color: var(--ex-dim);
   display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
@@ -137,14 +138,25 @@ def render(d: dict, live: bool) -> str:
     nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
                   f'{_esc(x["group"].replace(" Voidstone", ""))}</span>{_esc(x["name"])}</div>' for x in m.get("next", []))
     phase = "Mapping" if d.get("phase") == "mapping" else "Endgame"
+    top = m.get("top_tier") or 0
+    on = live and bool(m.get("anchor_utc")) and not m.get("afk")
+    clock = _ticker(m.get("mapping_s") or 0, m.get("anchor_utc"), on) if m.get("mapping_s") is not None else "–"
+    states = m.get("bar") or ["pending"] * 16
+    bar = "".join(f'<div><i style="width:{0 if st == "pending" else 100}%" class="{"cur" if st == "current" else ("skip" if st == "skipped" else "")}"></i></div>'
+                  for st in states)
+    stones = "".join(f'<span title="{_esc(x["name"])} Voidstone" style="color:{"var(--ex-gold)" if x["done"] else "var(--ex-dim)"}">'
+                     f'{"☑" if x["done"] else "☐"} {_esc(x["name"][:4])}</span>' for x in m.get("stones", []))
+
+    def rate(v):
+        return "–" if v is None else fmt.num(v, 1)
     return (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span><span class="ch">· {_esc(m.get("character") or "")}</span>'
             f'<span class="sp"></span>{top_buttons}</div>'
-            f'<div class="m-clock">{m.get("voidstones", 0)}<span style="font-size:18px;color:var(--ex-muted)">/{m.get("voidstones_total", 4)}</span>'
-            f'<span class="pct">Voidstones</span></div>'
-            f'<div class="m-where">{phase} · highest tier {fmt.tier(m.get("top_tier")) if m.get("top_tier") else "–"}</div>'
-            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>Lv <b>{m.get("level") or "–"}</b></span>'
-            f'<span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
-            f'<div class="m-row"><span>Time mapping <b>{fmt.dur(m.get("mapping_s"), True) if m.get("mapping_s") is not None else "–"}</b></span></div>'
+            f'<div class="m-clock">{clock}<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span></div>'
+            f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}</div>'
+            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
+            f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
+            f'<div class="m-bar">{bar}</div>'
+            f'<div class="m-row" style="margin-top:7px">{stones}</div>'
             + (f'<div class="m-h">NEXT UP</div>{nxt}' if nxt else ""))
 
 

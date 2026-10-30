@@ -136,6 +136,15 @@ def single_instance(wait: float = 8.0, name: str = "tracker.lock") -> bool:
         return True
 
 
+def release_instance() -> None:
+    """Let go of the locks single_instance() took (the restart helper uses this)."""
+    for f in globals().pop("_LOCKS", []):
+        try:
+            f.close()
+        except OSError:
+            pass
+
+
 def safety_copy(name: str = "before-rebuild") -> Path | None:
     """A copy of the database taken just before a rebuild wipes the tables."""
     src = paths.db_path()

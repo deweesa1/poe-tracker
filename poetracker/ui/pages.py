@@ -507,6 +507,32 @@ def copied_tab(lg, cid):
 
 
 # ====================================================================== Campaign
+def _league_box(lg: str | None, label: str, ts: str | None, sub: str) -> None:
+    """The banner at the top of both League Start pages: the league, when it
+    launched, and when you started (or entered maps)."""
+    from datetime import datetime, timezone
+    lgo = next((l for l in STATE.cfg.leagues if l.name == lg), None)
+    now = datetime.now(timezone.utc)
+    if lgo:
+        lg_start = lgo.start.strftime("%Y-%m-%dT%H:%M:%SZ")
+        ended = lgo.end and lgo.end <= now
+        age = ((lgo.end if ended else now) - lgo.start).total_seconds()
+        age_txt = (f"Ran {age / 86400:.0f} days" if ended else
+                   f"Running for {int(age // 86400)}d {int(age % 86400 // 3600)}h")
+    else:
+        lg_start, age_txt = None, ""
+    with ui.element("div").classes("pt-kpi w-full"):
+        with ui.row().classes("w-full items-center gap-6").style("row-gap:12px"):
+            with ui.column().classes("gap-0").style("flex:1 1 280px"):
+                ui.label("League").classes("k")
+                ui.label(lg or "–").classes("pt-ls-name").style("font-size:30px;font-weight:700;line-height:1.15")
+                ui.label(f"Launched {fmt.when(lg_start)}" + (f" · {age_txt}" if age_txt else "")).classes("pt-note").style("font-size:14px")
+            with ui.column().classes("gap-0").style("flex:0 1 auto"):
+                ui.label(label).classes("k")
+                ui.label(fmt.when(ts) if ts else "Not yet").style("font-size:24px;font-weight:700;line-height:1.2")
+                ui.label(sub).classes("pt-note").style("font-size:14px")
+
+
 @ui.page("/campaign")
 def campaign_page():
     if (r := locked("/campaign")):
@@ -550,35 +576,16 @@ def campaign_page():
         with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
             with ui.tab_panel("splits").classes("q-pa-none"):
                 with ui.column().classes("w-full gap-4"):
-                    lgo = next((l for l in STATE.cfg.leagues if l.name == lg), None)
-                    from datetime import datetime, timezone
-                    now = datetime.now(timezone.utc)
-                    if lgo:
-                        lg_start = lgo.start.strftime("%Y-%m-%dT%H:%M:%SZ")
-                        ended = lgo.end and lgo.end <= now
-                        age = ((lgo.end if ended else now) - lgo.start).total_seconds()
-                        age_txt = (f"Ran {age / 86400:.0f} days" if ended else
-                                   f"Running for {int(age // 86400)}d {int(age % 86400 // 3600)}h")
-                    else:
-                        lg_start, age_txt = None, ""
                     after = sp["after_league_start_s"]
-                    with ui.element("div").classes("pt-kpi w-full"):
-                        with ui.row().classes("w-full items-center gap-6").style("row-gap:12px"):
-                            with ui.column().classes("gap-0").style("flex:1 1 280px"):
-                                ui.label("League").classes("k")
-                                ui.label(lg or "–").classes("pt-ls-name").style("font-size:30px;font-weight:700;line-height:1.15")
-                                ui.label(f"Launched {fmt.when(lg_start)}" + (f" · {age_txt}" if age_txt else "")).classes("pt-note").style("font-size:14px")
-                            with ui.column().classes("gap-0").style("flex:0 1 auto"):
-                                ui.label("You Started").classes("k")
-                                ui.label(fmt.when(sp["start"])).style("font-size:24px;font-weight:700;line-height:1.2")
-                                ui.label(f"+{fmt.dur(after, True)} after launch · {sp['character']}" if after is not None
-                                         else sp["character"] or "").classes("pt-note").style("font-size:14px")
+                    _league_box(lg, "You Started", sp["start"],
+                                f"+{fmt.dur(after, True)} after launch · {sp['character']}" if after is not None
+                                else sp["character"] or "")
                     kpis([
                         ("Zones per Hour", rate(rt["zones_per_h"]), f"{rt['zones']} zones entered"),
                         ("Acts per Hour", rate(rt["acts_per_h"]), f"{rt['acts_done']} of 10 acts done"),
                         ("Levels per Hour", rate(rt["levels_per_h"]), f"level {sp['level_end']}"),
                         ("Deaths per Hour", rate(rt["deaths_per_h"]), f"{sp['deaths']} deaths"),
-                    ], columns=4)
+                    ], columns=4, min_width=125)
 
                     # ---- progress: one equal block per act, filled by how far into it you are
                     with card("Campaign Progress"):
@@ -788,6 +795,13 @@ BOSS_COLS = MS_COLS + [
 ]
 
 
+STONE_COLS = [({**c, "opt": True} if c["name"] in ("days", "level") else c) for c in BOSS_COLS if c["name"] != "character"]
+
+
+def _rate(v, d: int = 1) -> str:
+    return "–" if v is None else fmt.num(v, d)
+
+
 @ui.page("/mapping")
 def mapping_page():
     if (r := locked("/mapping")):
@@ -800,6 +814,7 @@ def mapping_page():
            f"{lock['name']} · highest tier so far (first to a T16 map takes this)") if lock.get("id") else ""
     body = frame("/mapping", "League Start Mapping", " · ".join(x for x in (lg, who) if x),
                  None if live else (lambda: league_select(_reload)))
+    holder: dict = {}
 
     @ui.refreshable
     def content():
@@ -809,62 +824,266 @@ def mapping_page():
         k = m["kpis"]
         if not k:
             return empty("No characters in this league yet.")
-        kpis([
-            ("Voidstones", f"{k['voidstones']} of {k['voidstones_total']}", f"bosses killed by {m['character']}"),
-            ("Highest Tier", fmt.tier(k["top_tier"]) if k["top_tier"] else "–"),
-            ("Maps Ran", fmt.num(k["maps"]), f"{fmt.num(k['map_deaths'])} deaths in maps"),
-            ("Time Mapping", fmt.dur(k["mapping_played_s"], True) if k["mapping_played_s"] is not None else "–",
-             "play time since the campaign"),
-            ("Level", fmt.num(k["level"])),
-            ("League Day", f"Day {int(k['days']) + 1}" if k["days"] is not None else "–",
-             f"{fmt.dur(k['played_s'], True)} played"),
-        ], columns=6)
+        tab = STATE.pref("mapping_tab", "progress")
+        with ui.tabs(value=tab, on_change=lambda e: STATE.set_pref("mapping_tab", e.value)).props(
+                "dense align=left active-color=primary indicator-color=primary").classes("text-grey-5") as tabs:
+            ui.tab("progress", "Progress")
+            ui.tab("voidstones", "Voidstones")
+            ui.tab("checklist", "Checklist")
+        holder["tabs"] = tabs
+        with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
+            with ui.tab_panel("progress").classes("q-pa-none"):
+                with ui.column().classes("w-full gap-4"):
+                    _mapping_progress(lg, m)
+            with ui.tab_panel("voidstones").classes("q-pa-none"):
+                with ui.column().classes("w-full gap-4"):
+                    _mapping_voidstones(m, holder)
+            with ui.tab_panel("checklist").classes("q-pa-none"):
+                with ui.column().classes("w-full gap-4"):
+                    _mapping_checklist(lg, m)
 
-        nxt = [x for x in m["milestones"] if not x["done"] and not x.get("voidstone")][:4]
-        if nxt:
-            with card("Next Up"):
-                with ui.element("div").classes("w-full").style(
-                        "display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(max(200px, calc((100% - 36px) / 4)), 1fr))"):
-                    for x in nxt:
-                        with ui.element("div").classes("pt-kpi"):
-                            ui.label(x["group"]).classes("k")
-                            ui.label(x["name"]).classes("text-weight-bold").style("font-size:15px")
-                            if x.get("attempts"):
-                                ui.label(f"{x['attempts']} attempt{'s' if x['attempts'] != 1 else ''} so far").classes("pt-note")
-
-        with card("Tier Progression"):
-            table([
-                {"name": "tier", "label": "Tier", "fmt": lambda v, r: fmt.tier(v)},
-                {"name": "first_map", "label": "First Map", "fmt": lambda v, r: v or "–"},
-                {"name": "days", "label": "League Day", "num": True, "fmt": lambda v, r: f"Day {int(v) + 1}" if r["done"] else "–"},
-                {"name": "played_s", "label": "Play Time", "num": True, "fmt": lambda v, r: fmt.dur(v, True) if r["done"] else "–"},
-                {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "" if v is None else str(v)},
-                {"name": "maps", "label": "Maps Ran", "num": True},
-                {"name": "avg_s", "label": "Average Map", "num": True, "fmt": lambda v, r: fmt.dur(v)},
-                {"name": "fastest_s", "label": "Fastest", "num": True, "fmt": lambda v, r: fmt.dur(v)},
-                {"name": "deaths", "label": "Deaths", "num": True},
-            ], m["tiers"], page_size=len(m["tiers"]))
-            note(f"League Day and Play Time show when {m['character'] or 'the character'} first ran a map of that tier. "
-                 "Play time is that character's, AFK left out. Every number on this page is for that character only.")
-
-        groups_atlas = [x for x in m["milestones"] if x["group"] == "Atlas"]
-        groups_char = [x for x in m["milestones"] if x["group"] in ("Character", "Labyrinth")]
-        bosses = [x for x in m["milestones"] if x["group"] not in ("Atlas", "Character", "Labyrinth")]
-        with card("Atlas Progression"):
-            table(MS_COLS, groups_atlas, page_size=len(groups_atlas))
-        with card("Character and Labyrinth"):
-            table(BOSS_COLS, groups_char, page_size=len(groups_char))
-        with card("Pinnacle Bosses and Voidstones"):
-            rows = [{**x, "name": x["name"] if x.get("voidstone") else f"{x['group'].split()[0]} · {x['name']}"} for x in bosses]
-            table(BOSS_COLS, rows, page_size=len(rows))
-            note("✓ = defeat line in the log. ✓? = the fight has no defeat line, so leaving the arena alive counts. "
-                 "Bosses and lines are in milestones.yaml.")
+    def stone_jump(e):
+        i = str(e.args).strip('[]"\' ')
+        if holder.get("tabs"):
+            holder["tabs"].set_value("voidstones")
+        if holder.get("stones"):
+            holder["stones"].set_value(f"stone{i}")
+        STATE.set_pref("mapping_stone", f"stone{i}")
+    ui.on("stone_jump", stone_jump)
+    ui.add_body_html("""<script>
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a.pt-stone");
+  if (!a) return;
+  e.preventDefault();
+  emitEvent("stone_jump", a.dataset.i);
+});
+</script>""")
 
     with body:
         content()
     auto_refresh(content.refresh)
 
-# ====================================================================== Characters
+
+def _mapping_progress(lg: str, m: dict) -> None:
+    en, rt = m.get("entered"), m.get("rates") or {}
+    if en:
+        al = en["after_launch_s"]
+        sub = ((f"+{int(al // 86400)}d {int(al % 86400 // 3600)}h" if al >= 86400 else f"+{fmt.dur(al, True)}") +
+               " after launch · " if al is not None else "") + \
+              f"{fmt.tier(en['tier'])} {en['area'] or ''} · {m['character']}"
+    else:
+        sub = f"{m['character']} hasn't run a map yet" if m.get("character") else ""
+    _league_box(lg, "You Entered Maps", en["ts_utc"] if en else None, sub)
+
+    climb = (f"{fmt.tier(rt['climb_from'])} → {fmt.tier(rt['climb_to'])} in {fmt.dur(rt['climb_s'], True)}"
+             if rt.get("climb_to") and rt.get("climb_s") else "no tier climbed yet")
+    kpis([
+        ("Maps per Hour", _rate(rt.get("maps_per_h")), f"{fmt.num(rt.get('maps') or 0)} maps ran"),
+        ("Tiers per Hour", _rate(rt.get("tiers_per_h")), climb),
+        ("Levels per Hour", _rate(rt.get("levels_per_h")),
+         f"level {en['level']} → {m['kpis']['level']}" if en else ""),
+        ("Deaths per Hour", _rate(rt.get("deaths_per_h")), f"{fmt.num(rt.get('deaths') or 0)} deaths"),
+    ], columns=4, min_width=125)
+
+    # ---- tier progress bar, like the campaign one
+    bar = m.get("bar") or []
+    with card("Map Tier Progress"):
+        top = (m["kpis"].get("top_tier") or 0)
+        cur = next((b for b in bar if b["state"] == "current"), None)
+        status = (f"Highest tier {fmt.tier(min(top, 16))}" + (" · Nightmare maps reached" if top >= 17 else "")
+                  if top else "No maps yet")
+        played = en["played_s"] if en else 0
+        ui.html(
+            f'<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px">'
+            f'<span style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums">{fmt.clock(played)}</span>'
+            f'<span style="font-size:20px;color:var(--lg, #d9a441);font-weight:600">{min(top, 16) / 16 * 100:.0f}%</span>'
+            f'<span class="pt-note" style="font-size:14px">{status}</span></div>').classes("w-full")
+        done_t = [b["time_s"] for b in bar if b["state"] == "done" and b["time_s"]]
+        ref = (sum(done_t) / len(done_t)) if done_t else 1.0
+        segs = ""
+        for b in bar or [{"tier": t, "state": "pending", "time_s": None} for t in range(1, 17)]:
+            n, st = b["tier"], b["state"]
+            if st == "done":
+                grow, fill, bg = min(max(((b["time_s"] or 0) / ref) ** 0.5, 0.7), 3.0), 1.0, "var(--lg, #d9a441)"
+                sub, tip = fmt.dur(b["time_s"], True) if b["time_s"] else "–", f"T{n}: {fmt.clock(b['time_s'] or 0)} before the next tier"
+            elif st == "current":
+                grow, fill, bg = min(max(((b["time_s"] or 0) / ref) ** 0.5, 1.0), 2.0) if done_t else 1.0, 1.0, "var(--lg-cur, #4fb3a5)"
+                sub, tip = fmt.dur(b["time_s"], True), f"T{n}: your highest tier, {fmt.clock(b['time_s'] or 0)} so far"
+            elif st == "skipped":
+                grow, fill, bg = 0.6, 1.0, "#5a4c3c"
+                sub, tip = "skip", f"T{n}: skipped (you went straight to a higher tier)"
+            else:
+                grow, fill, bg = 1.0, 0.0, "#4fb3a5"
+                sub, tip = "", f"T{n}: not reached"
+            text_c = "#14110f" if fill and st != "skipped" else "#a69b8c"
+            clip = "white-space:nowrap;overflow:hidden;text-overflow:clip;"
+            segs += (f'<div title="{tip}" style="flex:{grow:.4f} 1 0;min-width:0;position:relative;height:44px;'
+                     f'background:#2d2722;border-radius:5px;overflow:hidden;'
+                     f'{"" if fill else "outline:1px dashed #4a4038;outline-offset:-1px;"}">'
+                     f'<div style="position:absolute;inset:0;width:{fill * 100:.0f}%;background:{bg}"></div>'
+                     f'<div style="position:relative;display:flex;flex-direction:column;justify-content:center;'
+                     f'align-items:center;height:100%;padding:0 2px;color:{text_c}">'
+                     f'<span style="font-size:12.5px;font-weight:700;line-height:1.1;{clip}">{n}</span>'
+                     f'<span style="font-size:10px;font-weight:600;line-height:1.2;opacity:.85;{clip}">{sub}</span>'
+                     f'</div></div>')
+        ui.html(f'<div style="display:flex;gap:3px;width:100%;margin-bottom:6px">{segs}</div>').classes("w-full")
+        note("One block per tier. Tiers you haven't reached share the bar equally; each tier you've moved past takes "
+             "more width the longer you spent there before reaching the next one (hover for the exact time). The "
+             "highest tier you've reached is highlighted; skipped tiers are the thin dark blocks. The clock is play time since your first map, AFK left out.")
+
+    # ---- voidstones: tick boxes that open each one's requirements
+    vs = (m.get("voidstones") or {}).get("voidstones") or []
+    with card(f"Voidstones · {sum(s['obtained'] for s in vs)} of {len(vs)}"):
+        tiles = ""
+        for i, s in enumerate(vs):
+            box = "☑" if s["obtained"] else "☐"
+            when = (f"Obtained {fmt.when(s['when'])}" + (" (likely)" if s["likely"] else "")) if s["obtained"] else \
+                   f"{s['steps_done']} of {s['steps_total']} steps"
+            colour = "var(--ex-gold, #d9a441)" if s["obtained"] else "var(--ex-text, #ece4d8)"
+            tiles += (f'<a class="pt-stone pt-kpi" data-i="{i}" href="#" title="Open {s["name"]} requirements" '
+                      f'style="text-decoration:none;display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:inherit">'
+                      f'<span style="font-size:24px;line-height:1;color:{colour}">{box}</span>'
+                      f'<span style="display:flex;flex-direction:column;min-width:0">'
+                      f'<span style="font-weight:700;font-size:15px;color:{colour}">{s["name"]}</span>'
+                      f'<span class="pt-note" style="font-size:12.5px">{s["from"] or ""}</span>'
+                      f'<span class="pt-note" style="font-size:12.5px">{when} ›</span></span></a>')
+        ui.html(f'<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill, minmax(max(200px, calc((100% - 30px) / 4)), 1fr))">'
+                f'{tiles}</div>').classes("w-full")
+        note("Click a voidstone to see what it takes and how far you are.")
+
+    with card("Tier Progression"):
+        table([
+            {"name": "tier", "label": "Tier", "fmt": lambda v, r: fmt.tier(v)},
+            {"name": "first_map", "label": "First Map", "fmt": lambda v, r: v or "–"},
+            {"name": "days", "label": "League Day", "num": True, "fmt": lambda v, r: f"Day {int(v) + 1}" if r["done"] else "–"},
+            {"name": "played_s", "label": "Play Time", "num": True, "fmt": lambda v, r: fmt.dur(v, True) if r["done"] else "–"},
+            {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "" if v is None else str(v), "opt": True},
+            {"name": "maps", "label": "Maps Ran", "num": True},
+            {"name": "avg_s", "label": "Average Map", "num": True, "fmt": lambda v, r: fmt.dur(v)},
+            {"name": "fastest_s", "label": "Fastest", "num": True, "fmt": lambda v, r: fmt.dur(v), "opt": True},
+            {"name": "deaths", "label": "Deaths", "num": True},
+        ], m["tiers"], page_size=len(m["tiers"]))
+        note(f"League Day and Play Time show when {m['character'] or 'the character'} first ran a map of that tier. "
+             "Play time is that character's, AFK left out. The rates above count from your first map; Tiers per Hour "
+             "counts only the climb to your highest tier, so it doesn't drop while you farm.")
+
+
+def _mapping_voidstones(m: dict, holder: dict) -> None:
+    vs = (m.get("voidstones") or {}).get("voidstones") or []
+    if not vs:
+        return empty("No voidstones set up in milestones.yaml.")
+    cur = STATE.pref("mapping_stone", "stone0")
+    if cur not in {f"stone{i}" for i in range(len(vs))}:
+        cur = "stone0"
+    with ui.tabs(value=cur, on_change=lambda e: STATE.set_pref("mapping_stone", e.value)).props(
+            "dense align=left no-caps active-color=primary indicator-color=primary inline-label outside-arrows mobile-arrows").classes(
+            "text-grey-5") as tabs:
+        for i, s in enumerate(vs):
+            ui.tab(f"stone{i}", ("☑ " if s["obtained"] else "☐ ") + s["name"].replace(" Voidstone", ""))
+    holder["stones"] = tabs
+    with ui.tab_panels(tabs, value=cur).classes("w-full bg-transparent").style("width:100%").props("animated=false"):
+        for i, s in enumerate(vs):
+            with ui.tab_panel(f"stone{i}").classes("q-pa-none w-full").style("width:100%"):
+                rows = [x for x in m["milestones"] if x["group"] == s["name"]]
+                steps = [x for x in rows if not x.get("voidstone")]
+                got = next((x for x in rows if x.get("voidstone")), None)
+                with card(s["name"]):
+                    if s["obtained"]:
+                        head = (f"Obtained {fmt.when(s['when'])}" + (" (likely)" if s["likely"] else "") +
+                                (f" · League Day {int(got['days']) + 1}" if got and got.get("days") is not None else "") +
+                                (f" · {fmt.dur(got['played_s'], True)} play time" if got and got.get("played_s") else ""))
+                    else:
+                        head = f"Not yet · {s['steps_done']} of {s['steps_total']} steps done"
+                    ui.label(head).style("font-size:18px;font-weight:600;color:var(--ex-gold, #d9a441)")
+                    ui.label(f"Dropped by {s['from']}. Requirements, in order:").classes("pt-note q-mb-sm")
+                    table(STONE_COLS, steps, page_size=len(steps) or 1)
+                    note("✓ = defeat line in the log. ✓? = the fight has no defeat line, so leaving the arena alive counts. "
+                         "Attempts = separate arena instances entered; Deaths = deaths in the arena. Steps and lines are in "
+                         "milestones.yaml.")
+
+
+def _mapping_checklist(lg: str, m: dict) -> None:
+    from datetime import datetime, timezone
+    checks = STATE.pref("map_checks") or {}
+    manual = checks.get(lg) or {}
+    ck = STATE.cached(("mapcheck", lg, json_key(manual)), lambda c: metrics.map_checklist(c, lg, manual), league=lg)
+    show = STATE.pref("map_filter", "all")
+
+    def toggle(name: str, value: bool, log_ts: str | None, sub, counter, kind):
+        allc = STATE.pref("map_checks") or {}
+        mine = dict(allc.get(lg) or {})
+        if value == bool(log_ts):
+            mine.pop(name, None)            # back to what the log says
+            txt = _check_sub(value, log_ts, "log" if log_ts else None, log_ts)
+        else:
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            mine[name] = [value, now]
+            txt = _check_sub(value, now if value else None, "manual", log_ts)
+        allc[lg] = mine
+        STATE.set_pref("map_checks", allc)
+        sub.set_text(txt)
+        counter["n"] += 1 if value else -1
+        counter["label"].set_text(f"{kind} · {counter['n']} of {counter['total']}")
+
+    def grid(title: str, items: list[dict], kind: str):
+        with ui.element("div").classes("pt-card w-full"):
+            counter = {"n": sum(i["done"] for i in items), "total": len(items)}
+            counter["label"] = ui.label(f"{title} · {counter['n']} of {counter['total']}").classes("pt-h2")
+            vis = [i for i in items if show == "all" or (show == "todo") != i["done"]]
+            if not vis:
+                ui.label("Nothing here with this filter.").classes("pt-note")
+            with ui.element("div").classes("w-full").style(
+                    "display:grid;gap:2px 12px;grid-template-columns:repeat(auto-fill, minmax(190px, 1fr))"):
+                for it in vis:
+                    with ui.row().classes("items-start no-wrap gap-1").style("min-width:0"):
+                        cb = ui.checkbox(value=it["done"]).props("dense size=sm color=primary").classes("q-mt-xs")
+                        with ui.column().classes("gap-0").style("min-width:0"):
+                            ui.label(it["name"]).classes("text-weight-medium").style(
+                                "font-size:14px;line-height:1.25;overflow-wrap:anywhere" +
+                                (";color:var(--ex-gold, #d9a441)" if it["done"] else ""))
+                            sub = ui.label(_check_sub(it["done"], it["ts_utc"], it["how"], it["ran_utc"], it["tier"])).classes(
+                                "pt-note").style("font-size:11.5px;line-height:1.2")
+                        cb.on_value_change(lambda e, it=it, sub=sub: toggle(it["name"], e.value, it["ran_utc"], sub, counter, title))
+
+    with ui.row().classes("w-full items-center gap-3"):
+        ui.toggle({"all": "All", "todo": "To Do", "done": "Done"}, value=show,
+                  on_change=lambda e: (STATE.set_pref("map_filter", e.value), _refresh_page())).props(
+            "dense no-caps unelevated toggle-color=primary text-color=grey-5")
+        ui.label("Ticked automatically the first time any of your characters in this league enters the map. "
+                 "Tick or untick by hand to correct it (say, for the Atlas bonus).").classes("pt-note").style("flex:1 1 260px")
+    grid("Atlas Maps", ck["maps"], "maps")
+    if not ck["has_pool"]:
+        note("This league's map pool isn't built in, so this lists the maps you ran.")
+    grid("Unique Maps", ck["uniques"], "uniques")
+    note("Replica maps use the same area as the original, so they share its row.")
+
+    atlas = [x for x in m["milestones"] if x["group"] == "Atlas"]
+    char = [x for x in m["milestones"] if x["group"] in ("Character", "Labyrinth")]
+    with card("Atlas Milestones"):
+        table(MS_COLS, atlas, page_size=len(atlas))
+    with card("Character and Labyrinth"):
+        table(BOSS_COLS, char, page_size=len(char))
+
+
+def _check_sub(done: bool, ts: str | None, how: str | None, ran: str | None, tier=None) -> str:
+    if done and how == "manual":
+        return f"ticked by you {fmt.when(ts)}"
+    if done:
+        return fmt.when(ts) + (f" · {fmt.tier(tier)}" if tier else "")
+    if how == "manual" and ran:
+        return f"unticked (first ran {fmt.when(ran)})"
+    return "not yet"
+
+
+def json_key(d: dict) -> str:
+    import json
+    return json.dumps(d, sort_keys=True)
+
+
+def _refresh_page() -> None:
+    ui.navigate.reload()
+
+
 @ui.page("/character")
 def character_page():
     if (r := locked("/character")):
