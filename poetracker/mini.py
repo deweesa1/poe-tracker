@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import threading
 import time
@@ -151,7 +152,14 @@ def run_mini() -> int:
         _message("PoE Tracker isn't running. Start it first, then open the mini tracker from its top bar.")
         return 1
     if not single_instance(name="mini.lock", wait=0):
-        return 0                                  # already open
+        # already open: bring it forward. If there's no window, an old copy got
+        # stuck after closing; end it and open a fresh one.
+        if _bring_forward():
+            return 0
+        _kill_stale()
+        if not single_instance(name="mini.lock", wait=5):
+            return 0
+    _write_pid()
     import webview
     cfg = config_mod.load_config()
     s = cfg.settings
@@ -176,7 +184,9 @@ def run_mini() -> int:
 
         def close(self):
             save()
-            win.destroy()
+            closing.set()
+            # destroy from another thread: doing it inside the JS call can hang the window
+            threading.Thread(target=win.destroy, daemon=True).start()
 
     def save():
         try:
@@ -185,6 +195,7 @@ def run_mini() -> int:
             p.update(locked=state["locked"])
         _save_prefs(p)
 
+    closing = threading.Event()
     win = webview.create_window(
         TITLE, url + "/mini", js_api=Api(), width=int(p.get("width", 300)), height=int(p.get("height", 380)),
         x=p.get("x"), y=p.get("y"), frameless=True, easy_drag=True, on_top=True, resizable=True,
@@ -206,8 +217,7 @@ def run_mini() -> int:
                              daemon=True, name="mini-hotkey").start()
         # remember where it was put; close when the main tracker closes
         last, gone = None, 0
-        while True:
-            time.sleep(5)
+        while not closing.wait(5):
             try:
                 now = (win.x, win.y, win.width, win.height)
                 if now != last:
@@ -221,8 +231,58 @@ def run_mini() -> int:
                 win.destroy()
                 return
 
+    win.events.closed += closing.set
     webview.start(started)
-    return 0
+    # Make sure nothing keeps this process (and mini.lock) alive after the window
+    # is gone, or the button can't open the mini tracker again.
+    try:
+        (paths.data_dir() / "mini.pid").unlink()
+    except OSError:
+        pass
+    os._exit(0)
+
+
+def _write_pid() -> None:
+    try:
+        (paths.data_dir() / "mini.pid").write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _bring_forward() -> bool:
+    """Show the open mini window on top. False when there's no such window."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, TITLE)
+        if not hwnd or not ctypes.windll.user32.IsWindowVisible(hwnd):
+            return False
+        ctypes.windll.user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+        return True
+    except Exception:
+        return False
+
+
+def _kill_stale() -> None:
+    """End a mini tracker process that lost its window but kept running."""
+    try:
+        pid = int((paths.data_dir() / "mini.pid").read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return
+    if pid == os.getpid():
+        return
+    try:
+        if sys.platform == "win32":
+            import subprocess
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, timeout=10,
+                           creationflags=0x08000000)
+        else:
+            import signal
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        log.exception("couldn't end the old mini tracker")
 
 
 def _message(text: str) -> None:

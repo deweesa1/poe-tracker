@@ -73,6 +73,10 @@ def run(window: str | None = None, port: int | None = None) -> None:
     if cfg.settings.get("mini_on_start") and window != "headless":
         app.on_startup(lambda: mini_mod.launch_mini())
     if native:
-        ui.run(native=True, window_size=(1500, 950), **kwargs)
+        from . import winpos
+        size, extra = winpos.window_args()
+        app.native.window_args.update(extra)
+        winpos.track(app)
+        ui.run(native=True, window_size=size, **kwargs)
     else:
         ui.run(show=bool(cfg.settings.get("open_browser", True)) and window != "headless", **kwargs)
