@@ -943,8 +943,25 @@ def league_start_status(con, config: Config, league: str | None = None) -> dict:
     out["campaign_end"] = cp["end"]
     vs = voidstones(con, config, league)
     out["voidstones"], out["voidstones_total"] = vs["obtained"], vs["total"]
-    out["phase"] = "mapping" if vs["obtained"] < vs["total"] else "done"
+    end, reason = league_start_end(config, league, vs)
+    out["end_utc"], out["end_reason"] = end, reason
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out["phase"] = "mapping" if not end or end > now else "done"
     return out
+
+
+def league_start_end(config: Config, league: str, vs: dict) -> tuple[str | None, str | None]:
+    """When league start ends: the last Voidstone, or league_start_days (14)
+    after the league launched, whichever comes first. Returns (time, reason)
+    where reason is "voidstones" or "days"; the time can be in the future."""
+    days = float((config.settings or {}).get("league_start_days", 14) or 0)
+    lg = next((l for l in config.leagues if l.name == league), None)
+    cap = (lg.start + timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ") if lg and days > 0 else None
+    stones = vs.get("voidstones") or []
+    last = max((x["when"] for x in stones if x["when"]), default=None) if stones and all(x["obtained"] for x in stones) else None
+    if last and (not cap or last <= cap):
+        return last, "voidstones"
+    return cap, ("days" if cap else None)
 
 
 def campaign_lock(con, league: str | None) -> dict:
@@ -1122,8 +1139,14 @@ def campaign_splits(con, character_id: int) -> dict | None:
         })
     # Labyrinths this character finished (at any point, campaign or later).
     labs = []
+    # League start ends with the campaign: nothing after the Act 10 finish counts here
+    cut = base["end"] if base["completed"] else "9999"
+    # quest rewards and /passives get 10 minutes' grace (Lani hands out An End
+    # to Hunger just after Kitava; people type /passives right away)
+    qcut = (datetime.fromisoformat(cut.replace("Z", "+00:00")) + timedelta(minutes=10)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ") if base["completed"] else "9999"
     kills = {r[0]: r[1] for r in con.execute(
-        "SELECT boss, MIN(ts_utc) FROM boss_kill WHERE character_id=? GROUP BY boss", (character_id,))}
+        "SELECT boss, MIN(ts_utc) FROM boss_kill WHERE character_id=? AND ts_utc<=? GROUP BY boss", (character_id, cut))}
     for i, boss in enumerate(LAB_BOSSES[:3]):
         prefix = f"{i + 1}_Labyrinth"
         lab_v = _rows(con, """SELECT v.id, v.start_utc, v.active_s, (SELECT COUNT(*) FROM death d WHERE d.visit_id=v.id) AS deaths
@@ -1175,7 +1198,8 @@ def campaign_splits(con, character_id: int) -> dict | None:
         bosses[-1].update(done=True, split=total, level=acts[-1]["level_end"] if acts else None)
     # Trials of Ascendancy (Izaro's line when one is finished)
     trial_kills = {r[0]: r[1] for r in con.execute(
-        "SELECT boss, MIN(ts_utc) FROM boss_kill WHERE character_id=? AND boss LIKE 'Trial: %' GROUP BY boss", (character_id,))}
+        "SELECT boss, MIN(ts_utc) FROM boss_kill WHERE character_id=? AND boss LIKE 'Trial: %' AND ts_utc<=? GROUP BY boss",
+        (character_id, cut))}
     trials = []
     for i, (diff, aid, zone) in enumerate(TRIALS):
         name = f"Trial: {diff} · {zone}"
@@ -1191,9 +1215,10 @@ def campaign_splits(con, character_id: int) -> dict | None:
 
     # ---- passive points from quests
     qpts = _rows(con, """SELECT q.ts_utc, q.area_id, q.points FROM quest_point q LEFT JOIN area_visit v ON v.id=q.visit_id
-                         WHERE COALESCE(v.character_id, q.character_id)=? ORDER BY q.ts_utc""", (character_id,))
+                         WHERE COALESCE(v.character_id, q.character_id)=? AND q.ts_utc<=? ORDER BY q.ts_utc""", (character_id, qcut))
     rep_rows = _rows(con, """SELECT r.report_utc, r.quest, r.points FROM quest_report r LEFT JOIN area_visit v ON v.id=r.visit_id
-                             WHERE COALESCE(v.character_id, r.character_id)=? ORDER BY r.report_utc""", (character_id,))
+                             WHERE COALESCE(v.character_id, r.character_id)=? AND r.report_utc<=? ORDER BY r.report_utc""",
+                     (character_id, qcut))
     report_utc = rep_rows[-1]["report_utc"] if rep_rows else None
     report = {r["quest"]: r["points"] for r in rep_rows if r["report_utc"] == report_utc}
     got_by_town = defaultdict(list)
@@ -1201,8 +1226,8 @@ def campaign_splits(con, character_id: int) -> dict | None:
         got_by_town[q["area_id"]].extend([q["ts_utc"]] * (q["points"] or 1))
     # Deal with the Bandits: helping one gives a stat instead of the point
     br = con.execute("""SELECT b.reward, b.ts_utc FROM bandit_reward b LEFT JOIN area_visit v ON v.id=b.visit_id
-                        WHERE COALESCE(v.character_id, b.character_id)=? ORDER BY b.ts_utc DESC LIMIT 1""",
-                     (character_id,)).fetchone()
+                        WHERE COALESCE(v.character_id, b.character_id)=? AND b.ts_utc<=? ORDER BY b.ts_utc DESC LIMIT 1""",
+                     (character_id, qcut)).fetchone()
     helped = None
     if br:
         r = br[0].lower()
@@ -1296,10 +1321,18 @@ def mapping_progress(con, config: Config, league: str) -> dict:
     lg_start = lg.start.strftime("%Y-%m-%dT%H:%M:%SZ") if lg else None
     if not own:
         return {"milestones": [], "tiers": [], "kpis": {}}
+    status = league_start_status(con, config, league)
+    # League start is over at the last Voidstone or after league_start_days:
+    # nothing after that moment counts on this page.
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = status.get("end_utc")
+    cut = end if end and end <= now else None
+    lim = cut or "9999"
     q = ",".join("?" * len(own))
     names = {r[0]: r[1] for r in con.execute(f"SELECT id, name FROM character WHERE id IN ({q})", own)}
     ids_by_name = {v: k for k, v in names.items()}
-    vis = con.execute(f"SELECT start_utc, active_s FROM v_visit_active WHERE character_id IN ({q}) ORDER BY start_utc", own).fetchall()
+    vis = con.execute(f"SELECT start_utc, active_s FROM v_visit_active WHERE character_id IN ({q}) AND start_utc<=? ORDER BY start_utc",
+                      [*own, lim]).fetchall()
     starts, cum, t = [], [], 0.0
     for s, a in vis:
         t += a or 0
@@ -1313,6 +1346,8 @@ def mapping_progress(con, config: Config, league: str) -> dict:
     level_at = _level_lookup(con, own)
 
     def stamp(ts, cid=None, **extra):
+        if ts and cut and ts > cut:
+            ts = None                  # happened after league start ended
         return {"ts_utc": ts, "days": _secs(lg_start, ts) / 86400 if ts and lg_start else None,
                 "played_s": played_at(ts) if ts else None, "character": names.get(cid),
                 "level": level_at(cid, ts) if ts and cid else None, "done": bool(ts), **extra}
@@ -1321,7 +1356,7 @@ def mapping_progress(con, config: Config, league: str) -> dict:
         SELECT r.id, r.character_id, r.tier, r.area_name, r.start_utc,
                (SELECT COALESCE(SUM(v.active_s),0) FROM v_visit_active v WHERE v.run_id=r.id) AS active_s,
                (SELECT COUNT(*) FROM death d WHERE d.run_id=r.id) AS deaths
-        FROM run r WHERE r.kind='map' AND r.character_id IN ({q}) ORDER BY r.start_utc""", own)
+        FROM run r WHERE r.kind='map' AND r.character_id IN ({q}) AND r.start_utc<=? ORDER BY r.start_utc""", [*own, lim])
     tiers = []
     top = max([r["tier"] or 0 for r in runs_] or [0])
     for tier in range(1, max(16, top) + 1):
@@ -1334,7 +1369,6 @@ def mapping_progress(con, config: Config, league: str) -> dict:
                       "deaths": sum(r["deaths"] for r in rs)})
 
     ms: list[dict] = []
-    status = league_start_status(con, config, league)
     starter = status["starter"]
     row = stamp(status["campaign_end"], starter)
     if starter != mchar:
@@ -1356,7 +1390,8 @@ def mapping_progress(con, config: Config, league: str) -> dict:
         r = first_run(lambda r: (r["tier"] or 0) >= 17)
         ms.append({"group": "Atlas", "name": "First Nightmare map", **stamp(r["start_utc"], r["character_id"], detail=r["area_name"])})
 
-    lvl_rows = con.execute(f"SELECT character_id, level, ts_utc FROM level_up WHERE character_id IN ({q}) ORDER BY ts_utc", own).fetchall()
+    lvl_rows = con.execute(f"SELECT character_id, level, ts_utc FROM level_up WHERE character_id IN ({q}) AND ts_utc<=? ORDER BY ts_utc",
+                           [*own, lim]).fetchall()
     for n in (70, 75, 80, 85, 90):
         hit = next((r for r in lvl_rows if r[1] >= n), None)
         ms.append({"group": "Character", "name": f"Level {n}", **stamp(hit[2] if hit else None, hit[0] if hit else None)})
@@ -1369,6 +1404,11 @@ def mapping_progress(con, config: Config, league: str) -> dict:
         ms.append({"group": "Labyrinth", "name": boss, **stamp(fk["ts_utc"] if fk else None, cid),
                    "attempts": b.get("attempts"), "deaths": b.get("deaths")})
     vs = voidstones(con, config, league, mchar)
+    if cut:
+        for st_ in vs["voidstones"]:
+            if st_["when"] and st_["when"] > cut:
+                st_.update(obtained=False, when=None, likely=False)
+        vs["obtained"] = sum(x["obtained"] for x in vs["voidstones"])
     for s in vs["voidstones"]:
         for st in s["steps"]:
             if st.get("count_only"):
@@ -1395,8 +1435,9 @@ def mapping_progress(con, config: Config, league: str) -> dict:
         e_played = played_at(e_ts)
         map_s = max(total_played - e_played, 0.0)
         lvl_in = level_at(mchar, e_ts)
-        lvl_now = level_at(mchar, None)
-        deaths_since = con.execute("SELECT COUNT(*) FROM death WHERE character_id=? AND ts_utc>=?", (mchar, e_ts)).fetchone()[0]
+        lvl_now = level_at(mchar, cut)
+        deaths_since = con.execute("SELECT COUNT(*) FROM death WHERE character_id=? AND ts_utc>=? AND ts_utc<=?",
+                                   (mchar, e_ts, lim)).fetchone()[0]
         entered = {"ts_utc": e_ts, "tier": first["tier"], "area": first["area_name"],
                    "after_launch_s": _secs(lg_start, e_ts) if lg_start else None, "level": lvl_in,
                    "played_s": map_s}
@@ -1437,18 +1478,20 @@ def mapping_progress(con, config: Config, league: str) -> dict:
     return {
         "status": status, "milestones": ms, "tiers": tiers, "character_id": mchar, "character": names.get(mchar),
         "entered": entered, "rates": rates, "bar": bar, "voidstones": vs,
+        "ended": {"ts_utc": cut, "reason": status.get("end_reason")} if cut else None,
+        "ends_utc": end if end and not cut else None, "ends_reason": status.get("end_reason"),
         "kpis": {
             "voidstones": vs["obtained"], "voidstones_total": vs["total"], "top_tier": top or None,
             "maps": len(runs_), "map_deaths": sum(r["deaths"] for r in runs_),
             "played_s": total_played,
             "mapping_played_s": entered["played_s"] if entered else (total_played - camp_played if camp_played is not None else None),
-            "level": max([level_at(c, None) for c in own] or [None]),
-            "days": _secs(lg_start, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")) / 86400 if lg_start else None,
+            "level": max([level_at(c, cut) for c in own] or [None]),
+            "days": _secs(lg_start, cut or now) / 86400 if lg_start else None,
         },
     }
 
 
-def map_checklist(con, league: str, manual: dict | None = None) -> dict:
+def map_checklist(con, league: str, manual: dict | None = None, until: str | None = None) -> dict:
     """Every Atlas map and unique map for the league, with the first time any of
     your characters in the league ran it. `manual` is {map name: [done, ts]}
     from ticking boxes by hand, which wins over the log."""
@@ -1458,8 +1501,8 @@ def map_checklist(con, league: str, manual: dict | None = None) -> dict:
         SELECT v.area_id, v.area_name, v.start_utc, c.name AS character, r.tier
         FROM area_visit v JOIN v_own_character c ON c.id=v.character_id
         LEFT JOIN run r ON r.id=v.run_id
-        WHERE c.league=? AND (v.area_id LIKE 'MapWorlds%' OR v.area_id LIKE 'Synthesis_Map%')
-        ORDER BY v.start_utc""", (league,))
+        WHERE c.league=? AND (v.area_id LIKE 'MapWorlds%' OR v.area_id LIKE 'Synthesis_Map%') AND v.start_utc<=?
+        ORDER BY v.start_utc""", (league, until or "9999"))
     first_by_id, first_by_name = {}, {}
     for r in rows:
         first_by_id.setdefault(r["area_id"], r)
@@ -1548,7 +1591,8 @@ def mini_status(con, config: Config, league: str | None = None) -> dict:
                       (last["session_id"],)).fetchone() if last else None
     rt = m.get("rates") or {}
     out["mapping"] = {
-        "anchor_utc": last["start_utc"] if last and last["end_utc"] is None and m.get("entered") else None,
+        "anchor_utc": last["start_utc"] if last and last["end_utc"] is None and m.get("entered") and not m.get("ended") else None,
+        "ended": (m.get("ended") or {}).get("ts_utc"),
         "afk": bool(afk), "zone": last["area_name"] if last else None,
         "maps_per_h": rt.get("maps_per_h"), "tiers_per_h": rt.get("tiers_per_h"),
         "bar": [b["state"] for b in m.get("bar") or []],

@@ -507,7 +507,7 @@ def copied_tab(lg, cid):
 
 
 # ====================================================================== Campaign
-def _league_box(lg: str | None, label: str, ts: str | None, sub: str) -> None:
+def _league_box(lg: str | None, label: str, ts: str | None, sub: str, end: tuple | None = None) -> None:
     """The banner at the top of both League Start pages: the league, when it
     launched, and when you started (or entered maps)."""
     from datetime import datetime, timezone
@@ -531,6 +531,11 @@ def _league_box(lg: str | None, label: str, ts: str | None, sub: str) -> None:
                 ui.label(label).classes("k")
                 ui.label(fmt.when(ts) if ts else "Not yet").style("font-size:24px;font-weight:700;line-height:1.2")
                 ui.label(sub).classes("pt-note").style("font-size:14px")
+            if end:
+                with ui.column().classes("gap-0").style("flex:0 1 auto"):
+                    ui.label(end[0]).classes("k")
+                    ui.label(end[1]).style("font-size:24px;font-weight:700;line-height:1.2;color:var(--ex-gold, #d9a441)")
+                    ui.label(end[2]).classes("pt-note").style("font-size:14px")
 
 
 @ui.page("/campaign")
@@ -871,9 +876,20 @@ def _mapping_progress(lg: str, m: dict) -> None:
         sub = ((f"+{int(al // 86400)}d {int(al % 86400 // 3600)}h" if al >= 86400 else f"+{fmt.dur(al, True)}") +
                " after launch · " if al is not None else "") + \
               f"{fmt.tier(en['tier'])} {en['area'] or ''} · {m['character']}"
+    elif m.get("ended"):
+        sub = "League start ended before maps"
     else:
         sub = f"{m['character']} hasn't run a map yet" if m.get("character") else ""
-    _league_box(lg, "You Entered Maps", en["ts_utc"] if en else None, sub)
+    days = int((STATE.cfg.settings or {}).get("league_start_days", 14) or 14)
+    if m.get("ended"):
+        e = m["ended"]
+        why = "all Voidstones" if e["reason"] == "voidstones" else f"{days} days after launch"
+        end = ("League Start Ended", fmt.when(e["ts_utc"]), f"{why} · numbers stop here")
+    elif m.get("ends_utc"):
+        end = ("League Start Ends", fmt.when(m["ends_utc"]), f"or at your last Voidstone, if sooner")
+    else:
+        end = None
+    _league_box(lg, "You Entered Maps", en["ts_utc"] if en else None, sub, end)
 
     climb = (f"{fmt.tier(rt['climb_from'])} → {fmt.tier(rt['climb_to'])} in {fmt.dur(rt['climb_s'], True)}"
              if rt.get("climb_to") and rt.get("climb_s") else "no tier climbed yet")
@@ -1006,7 +1022,8 @@ def _mapping_checklist(lg: str, m: dict) -> None:
     from datetime import datetime, timezone
     checks = STATE.pref("map_checks") or {}
     manual = checks.get(lg) or {}
-    ck = STATE.cached(("mapcheck", lg, json_key(manual)), lambda c: metrics.map_checklist(c, lg, manual), league=lg)
+    until = (m.get("ended") or {}).get("ts_utc")
+    ck = STATE.cached(("mapcheck", lg, json_key(manual), until), lambda c: metrics.map_checklist(c, lg, manual, until), league=lg)
     show = STATE.pref("map_filter", "all")
 
     def toggle(name: str, value: bool, log_ts: str | None, sub, counter, kind):
@@ -1049,7 +1066,8 @@ def _mapping_checklist(lg: str, m: dict) -> None:
         ui.toggle({"all": "All", "todo": "To Do", "done": "Done"}, value=show,
                   on_change=lambda e: (STATE.set_pref("map_filter", e.value), _refresh_page())).props(
             "dense no-caps unelevated toggle-color=primary text-color=grey-5")
-        ui.label("Ticked automatically the first time any of your characters in this league enters the map. "
+        ui.label(("Only maps run before league start ended count. " if until else "") +
+                 "Ticked automatically the first time any of your characters in this league enters the map. "
                  "Tick or untick by hand to correct it (say, for the Atlas bonus).").classes("pt-note").style("flex:1 1 260px")
     grid("Atlas Maps", ck["maps"], "maps")
     if not ck["has_pool"]:
@@ -1565,13 +1583,19 @@ def settings_page():
         with card("League Start"):
             ls = league_start()
             phase = ls.get("real_phase") or ls.get("phase")
-            ui.label("From league launch until your first character finishes Act 10, only Overview, League Start Campaign, "
-                     "Standard and Settings are shown. After that, League Start Mapping is added until you have all four "
-                     "Voidstones, then every dashboard opens. Both League Start pages stay afterwards, with a league picker "
-                     "for past leagues. This follows the newest league below that has started.").classes("pt-sub")
+            days = int(STATE.cfg.settings.get("league_start_days", 14) or 14)
+            ui.label("League start is the opening stretch of a league. From launch until your first character finishes "
+                     "Act 10, only Overview, League Start Campaign, Standard and Settings are shown; the Campaign page "
+                     "stops counting at that Act 10 finish. Then League Start Mapping is added, and it stops counting at "
+                     f"your fourth Voidstone or {days} days after launch, whichever comes first. At that point every "
+                     "dashboard opens and both League Start pages stay frozen as a record, with a league picker for past "
+                     "leagues. This follows the newest league below that has started.").classes("pt-sub")
             cur = ls.get("league")
-            status = {"campaign": "Campaign phase", "mapping": f"Mapping phase ({ls.get('voidstones')} of 4 Voidstones)",
-                      "done": "League start finished"}.get(phase, "Off")
+            status = {"campaign": "Campaign phase",
+                      "mapping": f"Mapping phase ({ls.get('voidstones')} of 4 Voidstones" +
+                                 (f", ends {fmt.when(ls['end_utc'])} at the latest)" if ls.get("end_utc") else ")"),
+                      "done": "League start finished" + (f" {fmt.when(ls['end_utc'])}" if ls.get("end_utc") else "")
+                      }.get(phase, "Off")
             if ls.get("off"):
                 status = "Off"
             elif ls.get("unlocked"):
@@ -1590,7 +1614,17 @@ def settings_page():
             def unlock(on: bool):
                 STATE.set_pref("ls_unlocked", cur if on else None)
                 _reload()
+            def set_days(e):
+                try:
+                    n = max(1, min(int(e.value or 14), 120))
+                except (TypeError, ValueError):
+                    return
+                config_mod.save_settings({"league_start_days": n})
+                STATE.cfg.settings["league_start_days"] = n
+                STATE.invalidate()
             with ui.row().classes("items-center gap-4 q-mt-sm"):
+                ui.number("Longest league start (days)", value=days, min=1, max=120, step=1, format="%d",
+                          on_change=set_days).props("outlined dense dark debounce=800").style("width:230px")
                 ui.switch("League start mode", value=bool(STATE.cfg.settings.get("league_start_mode", True)), on_change=set_mode)
                 if not ls.get("off") and phase in ("campaign", "mapping"):
                     if ls.get("unlocked"):

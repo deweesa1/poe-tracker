@@ -152,12 +152,13 @@ def render(d: dict, live: bool) -> str:
     return (f'<div class="m-top"><span class="m-lg">{_esc(d["league"])}</span><span class="ch">· {_esc(m.get("character") or "")}</span>'
             f'<span class="sp"></span>{top_buttons}</div>'
             f'<div class="m-clock">{clock}<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span></div>'
-            f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}</div>'
+            + (f'<div class="m-where">League start finished {fmt.when(m["ended"])}</div>' if m.get("ended") else
+               f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}</div>') +
             f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
             f'<div class="m-bar">{bar}</div>'
             f'<div class="m-row" style="margin-top:7px">{stones}</div>'
-            + (f'<div class="m-h">NEXT UP</div>{nxt}' if nxt else ""))
+            + (f'<div class="m-h">NEXT UP</div>{nxt}' if nxt and not m.get("ended") else ""))
 
 
 @ui.page("/mini")
