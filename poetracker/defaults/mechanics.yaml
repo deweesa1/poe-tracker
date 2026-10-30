@@ -1,0 +1,24 @@
+# NPC speaker -> mechanic. When one of these speaks during a map run, the
+# run is tagged with the mechanic. The Maps page lists speakers heard in
+# maps that are not in this list, so you can add them here.
+# Changes apply after a restart (no rebuild needed).
+# Left out on purpose because they talk in maps without being a league
+# mechanic: The Maven, The Envoy, Zana, Sin, The Searing Exarch and The Eater
+# of Worlds (Eldritch altars don't write anything to the log).
+speakers:
+  "Einhar, Beastmaster": Bestiary
+  "Alva, Master Explorer": Incursion
+  "Niko, Master of the Depths": Delve
+  "Jun, Veiled Master": Betrayal
+  "Sister Cassia": Blight
+  "Strange Voice": Delirium
+  "The Trialmaster": Ultimatum
+  "Oshabi, Avatar of the Grove": Harvest
+  "Kirac, Vault Keeper": Kirac mission
+  "Dannig, Warrior Skald": Expedition
+  "Rog, the Disenchanter": Expedition
+  "Tujen, the Haggler": Expedition
+  "Gwennen, the Gambler": Expedition
+  "Ailith, First of the Keepers": Keepers
+  "Valerie, the Corsair": Valerie
+  "Vesper": Vesper

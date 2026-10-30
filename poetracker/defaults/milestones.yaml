@@ -1,0 +1,184 @@
+# Endgame milestones: the four Voidstones and the boss kills leading to them.
+#
+# How a kill is detected:
+#   kill_lines  - the boss says one of these lines when it dies (needs the
+#                 in-game option "Output Dialogue To Chat"). Reliable.
+#   no_death    - the boss doesn't speak when it dies, so a kill is assumed
+#                 when you leave its arena alive after at least `min_seconds`.
+#                 Shown as "likely" in the dashboard.
+# Area ids are the ones in Client.txt ("Generating level 84 area MavenBoss").
+# Voidstone sources from poedb.tw/Voidstone (3.25+).
+
+bosses:
+  The Maven:
+    area: '^MavenBoss$'                      # Absence of Mercy and Empathy
+    speaker: The Maven
+    kill_lines:
+      - "I apologize to the toy. I did not realise... you... were like me..."
+      - "...you... and I should do this again soon."
+      - "I hope we can continue to play together."
+      - "The toy refuses. The toy causes me pain. Is the toy... alive...?"
+      - "The living toy must enjoy our contests, for it continues to play."
+  The Maven's Crucible:
+    area: '^MavenHub$'                       # witnessed map-boss gauntlets
+    count_only: true
+  The Black Star:
+    area: '^MapWorldsPrimordialBoss2$'       # Polaric Void
+    speaker: The Black Star
+    kill_lines: ["How... unexpected...", "The dark light fades..."]
+  The Infinite Hunger:
+    area: '^MapWorldsPrimordialBoss1$'       # Seething Chyme
+    speaker: The Infinite Hunger
+    kill_lines: ["Death... is meaningless...", "The pain... never ends..."]
+  The Searing Exarch:
+    area: '^MapWorldsPrimordialBoss3$'       # Absence of Patience and Wisdom
+    speaker: The Searing Exarch
+    kill_lines: ["Improbable...!", "The hatchling... Surprises..."]
+  The Eater of Worlds:
+    area: '^MapWorldsPrimordialBoss4$'       # Absence of Symmetry and Harmony
+    speaker: The Eater of Worlds
+    kill_lines: ["You deny us... escape from pain..."]
+  The Shaper:
+    area: '^MapWorldsShapersRealm$'          # The Shaper's Realm
+    no_death: {min_seconds: 90}
+  The Elder:
+    area: '^MapWorldsElderArena$'            # Absence of Value and Meaning
+    no_death: {min_seconds: 60}
+  The Shaper and The Elder:
+    area: '^MapWorldsElderArenaUber$'        # The Shaper's Realm (Elder inside)
+    no_death: {min_seconds: 60}
+  Incarnation of Fear:
+    area: '^MapWorldsMemoryBoss1$'           # Moment of Trauma
+    speaker: Incarnation of Fear
+    kill_lines: ["Forgive me... I was not myself..."]
+  Incarnation of Neglect:
+    area: '^MapWorldsMemoryBoss2$'           # Moment of Loneliness
+    speaker: Incarnation of Neglect
+    kill_lines: ["Madness... consumes..."]
+  Incarnation of Dread:
+    area: '^MapWorldsMemoryBoss3$'           # Moment of Reverence
+    speaker: Incarnation of Dread
+    kill_lines: ["Her dread... shall not be erased so easily..."]
+
+  # Labyrinths: Izaro's last words in the final room ("..._boss_N_end").
+  Normal Labyrinth:
+    area: '^1_Labyrinth_boss_\d_end'
+    speaker: Izaro
+    kill_lines: &izaro_final
+      - "I die for the Empire!"
+      - "Delight in your gilded dungeon, ascendant."
+      - "Triumphant at last!"
+      - "You are free!"
+      - "The trap of tyranny is inescapable."
+      - "Your destination is more dangerous than the journey, ascendant."
+      - "For those who ascend too quickly, the fall is inevitable."
+  Cruel Labyrinth:
+    area: '^2_Labyrinth_boss_\d_end'
+    speaker: Izaro
+    kill_lines: *izaro_final
+  Merciless Labyrinth:
+    area: '^3_Labyrinth_boss_\d_end'
+    speaker: Izaro
+    kill_lines: *izaro_final
+  Eternal Labyrinth:
+    area: '^EndGame_Labyrinth_boss_\d_end'
+    speaker: Izaro
+    kill_lines: *izaro_final
+
+  # Shaper guardians (their fragments open The Shaper's Realm). The guardians
+  # don't speak when they die, so leaving the map alive counts.
+  Guardian of the Phoenix:
+    area: '^MapWorldsPhoenix$'
+    no_death: {min_seconds: 60}
+  Guardian of the Hydra:
+    area: '^MapWorldsHydra$'
+    no_death: {min_seconds: 60}
+  Guardian of the Minotaur:
+    area: '^MapWorldsMinotaur$'
+    no_death: {min_seconds: 60}
+  Guardian of the Chimera:
+    area: '^MapWorldsChimera$'
+    no_death: {min_seconds: 60}
+
+  # Trials of Ascendancy in the campaign: Izaro says one line when you finish
+  # each trial ("Trial: <difficulty> · <zone>").
+  "Trial: Normal · The Lower Prison":
+    area: '^1_1_7_1$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Belief is the strongest metal of them all."]
+  "Trial: Normal · The Crypt Level 1":
+    area: '^1_2_5_1$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Shine boldly so that all might find you when the night falls."]
+  "Trial: Normal · The Chamber of Sins Level 2":
+    area: '^1_2_6_2$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["There is a fine line between consideration and hesitation. The former is wisdom, the latter is fear."]
+  "Trial: Normal · The Crematorium":
+    area: '^1_3_3_1$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Allow your wisdom to be tempered by the flames of the past."]
+  "Trial: Normal · The Catacombs":
+    area: '^1_3_6$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["An emperor must bear two blades. Hope in the left hand. Surety in the right."]
+  "Trial: Normal · The Imperial Gardens":
+    area: '^1_3_15$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["An emperor must know precisely where he stands."]
+  "Trial: Cruel · The Lower Prison":
+    area: '^2_6_7_1$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Belief is the strongest metal of them all."]
+  "Trial: Cruel · The Crypt":
+    area: '^2_7_4$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Shine boldly so that all might find you when the night falls."]
+  "Trial: Cruel · The Chamber of Sins Level 2":
+    area: '^2_7_5_2$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["There is a fine line between consideration and hesitation. The former is wisdom, the latter is fear."]
+  "Trial: Merciless · The Bath House":
+    area: '^2_8_5$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["Allow your wisdom to be tempered by the flames of the past."]
+  "Trial: Merciless · The Tunnel":
+    area: '^2_9_7$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["An emperor must bear two blades. Hope in the left hand. Surety in the right."]
+  "Trial: Merciless · The Ossuary":
+    area: '^2_10_9$'
+    speaker: Izaro
+    trial: true
+    kill_lines: ["An emperor must know precisely where he stands."]
+
+# Each Voidstone: the steps on the way (in order) and which kills grant it.
+voidstones:
+  - name: Ceremonial Voidstone
+    from: The Maven
+    steps: [The Maven's Crucible, The Maven]
+    requires: [The Maven]
+  - name: Eldritch Voidstone
+    from: The Searing Exarch and The Eater of Worlds
+    steps: [The Black Star, The Infinite Hunger, The Searing Exarch, The Eater of Worlds]
+    requires: [The Searing Exarch, The Eater of Worlds]
+  - name: Decayed Voidstone
+    from: The Shaper and The Elder
+    steps: [Guardian of the Phoenix, Guardian of the Hydra, Guardian of the Minotaur, Guardian of the Chimera,
+            The Shaper, The Elder, The Shaper and The Elder]
+    requires: [The Shaper and The Elder]
+  - name: Originator Voidstone
+    from: Incarnation of Dread
+    steps: [Incarnation of Fear, Incarnation of Neglect, Incarnation of Dread]
+    requires: [Incarnation of Dread]

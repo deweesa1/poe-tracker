@@ -1,0 +1,79 @@
+# Regular expressions run against the message part of each Client.txt line
+# (everything after "[INFO Client 1234] "). Named groups become event data.
+# "contains" is a fast pre-check: the regex only runs if the text contains it.
+# Order matters: the first pattern that matches wins.
+patterns:
+  generating:
+    contains: "Generating level "
+    regex: '^Generating level (?P<level>\d+) area "(?P<area_id>[^"]+)" with seed (?P<seed>\d+)'
+  entered:
+    contains: "You have entered "
+    regex: '^: You have entered (?P<area_name>.+?)\.$'
+  level_up:
+    contains: " is now level "
+    regex: '^: (?P<character>\S+) \((?P<class>[^)]+)\) is now level (?P<level>\d+)$'
+  area_presence:
+    # Other players joining/leaving your area: those names are never you.
+    contains: " the area."
+    regex: '^: (?P<character>\S+) has (?P<action>joined|left) the area\.$'
+  death:
+    contains: " has been slain."
+    regex: '^: (?P<character>\S+) has been slain\.$'
+  login:
+    contains: "Async connecting to "
+    regex: '^Async connecting to (?P<server>\S*login\S*)'
+  game_closing:
+    contains: "Closing game"
+    regex: '^Closing game'
+  passive:
+    contains: "Successfully "
+    regex: '^Successfully (?P<action>allocated|unallocated) passive skill id: (?P<node_id>[^,]+), name: (?P<name>.+)$'
+  mastery:
+    contains: "mastery effect id"
+    regex: '^Successfully allocated mastery effect id: (?P<effect_id>\d+), mastery: (?P<mastery>[^,]+), name: (?P<name>.+)$'
+  afk:
+    contains: "AFK mode is now"
+    regex: '^: AFK mode is now (?P<state>ON|OFF)'
+  whisper:
+    contains: "@"
+    regex: '^@(?P<direction>From|To) (?:<(?P<guild>[^>]*)> )?(?P<who>[^:]+): (?P<message>.*)$'
+  trade_result:
+    contains: "Trade "
+    regex: '^: Trade (?P<result>accepted|cancelled)\.$'
+  quest_point:
+    # Only quest rewards print this (level-up points don't).
+    contains: " Passive Skill Point"
+    regex: '^: You have received (?:a|(?P<points>\d+)) Passive Skill Points?\.$'
+  bandit_reward:
+    # Helping a bandit: Alira (+15% to all Elemental Resistances), Oak (life),
+    # Kraityn (movement speed).
+    contains: "You have received +"
+    regex: '^: You have received (?P<reward>\+.+?)\.?$'
+  quest_report_start:
+    # The in-game /passives command: "23 Passive Skill Points from quests:"
+    contains: "Passive Skill Points from quests"
+    regex: '^: (?P<points>\d+) Passive Skill Points from quests:$'
+  quest_report:
+    # ...followed by one line per quest: "(1 from The Dweller of the Deep)"
+    contains: " from "
+    regex: '^: \((?P<points>\d+) from (?P<quest>[^)]+)\)$'
+  npc:
+    # NPC and boss dialogue ("Einhar, Beastmaster: ..."). Needs the in-game
+    # option Options > UI > Output Dialogue To Chat.
+    contains: ": "
+    regex: '^(?P<speaker>[A-Z][^:@#$%&<>\[\]]{1,60}): (?P<text>.+)$'
+
+# Speakers that are really engine messages, not NPCs.
+npc_ignore:
+  - Tile hash
+  - Doodad hash
+  - Enumerated adapter
+  - Enumerated device for adapter
+  - Enumerated output for adapter
+  - Successfully allocated passive skill id
+  - Successfully unallocated passive skill id
+  - Successfully allocated mastery effect id
+  - ALTERNATE TREE JEWEL
+  - Rebuilding UI
+  - Core
+  - Steam

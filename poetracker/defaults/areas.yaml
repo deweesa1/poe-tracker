@@ -1,0 +1,86 @@
+# How area ids from "Generating level N area <id>" are classified.
+# Rules are checked top to bottom; the first regex that matches the area id
+# decides the kind. Kinds:
+#   town      towns, hideouts, Kingsmarch, hubs (never part of a run)
+#   campaign  story zones (ids like 1_1_2 = part 1, act 1, zone 2)
+#   map       regular atlas maps
+#   boss      boss arenas and unique/special maps that are runs of their own
+#   activity  Heist, Delve, Labyrinth, Sanctum... (runs of their own)
+#   side      areas entered from inside a map (Vaal side areas, league
+#             encounters); they join the map run they were entered from
+# Anything unmatched with area level >= 68 is a side area when entered from
+# inside a run, otherwise a run of kind "other".
+rules:
+  - {match: '_town$',                 kind: town}
+  - {match: '^Hideout',               kind: town}
+  - {match: '^KalguuranSettlersLeague$', kind: town}
+  - {match: 'Hub$',                   kind: town}
+  - {match: '_Hub$',                  kind: town}
+  - {match: '^Menagerie',             kind: town}       # Einhar's Menagerie
+  - {match: '^ChayulaLeague$',        kind: town}       # Monastery of the Keepers
+  - {match: '^\d_\d+_',               kind: campaign}
+  - {match: '^\d_SideArea',           kind: campaign}   # optional areas inside acts
+  - {match: '^MapSideArea',           kind: side}
+  - {match: '^MapWorldsMemoryVault',  kind: side}   # Memory Vaults (Scholar's, Arkhon's...)
+  - {match: '^(MavenBoss|MapAtziri|Synthesis_MapBoss|AtlasExiles|MapWorldsShapersRealm|MapWorldsElderArena|MapWorldsElderArenaUber|MapAtlasBoss|AtlasBoss|EaterOfWorlds|SearingExarch|UberEaterOfWorlds|UberSearingExarch|Breach.*Boss|ChayulaLeagueTowerBoss)', kind: boss}
+  - {match: '^MapWorlds',             kind: map}
+  - {match: 'Labyrinth',              kind: activity, activity: Labyrinth}
+  - {match: '^Heist',                 kind: activity, activity: Heist}
+  - {match: '^Delve',                 kind: activity, activity: Delve}
+  - {match: '^Sanctum',               kind: activity, activity: Sanctum}
+  - {match: '^Map',                   kind: boss}
+
+# Side areas / league encounters inside maps that count as a mechanic.
+side_mechanics:
+  '^MapSideArea':        Vaal side area
+  '^MapWorldsMemoryVault': Memory Vault
+  'Incursion':           Incursion
+  '^AbyssLeague':        Abyss
+  '^LegionLeague':       Legion
+  '^AfflictionTown':     Delirium
+  '^HarvestLeague':      Harvest
+  '^SettlersBoss':       Settlers boss
+  '^DeepwaterEncounter': Fathomless Depths
+  '^AzmeriLeague':       Azmeri
+  '^Betrayal':           Betrayal
+  'Sanctum':             Sanctum
+  '^Expedition':         Expedition
+  '^Ritual':             Ritual
+
+# What each non-map run is, for "Other Endgame Content" on the Maps page.
+# group: Pinnacle boss | Atlas boss | League mechanic | Activity
+# Changes here apply straight away (no rebuild).
+content:
+  - {match: '^MavenBoss$',                 group: Pinnacle boss,   name: The Maven}
+  - {match: '^MapWorldsPrimordialBoss3$',  group: Pinnacle boss,   name: The Searing Exarch}
+  - {match: '^MapWorldsPrimordialBoss4$',  group: Pinnacle boss,   name: The Eater of Worlds}
+  - {match: '^MapWorldsElderArenaUber$',   group: Pinnacle boss,   name: The Shaper and The Elder}
+  - {match: '^MapWorldsShapersRealm$',     group: Pinnacle boss,   name: The Shaper}
+  - {match: '^MapWorldsElderArena$',       group: Pinnacle boss,   name: The Elder}
+  - {match: '^MapWorldsMemoryBoss3$',      group: Pinnacle boss,   name: Incarnation of Dread}
+  - {match: '^Synthesis_MapBoss',          group: Pinnacle boss,   name: Venarius (Cortex)}
+  - {match: '^MapAtziri',                  group: Pinnacle boss,   name: Atziri}
+  - {match: '^MapWorldsPrimordialBoss1$',  group: Atlas boss,      name: The Infinite Hunger}
+  - {match: '^MapWorldsPrimordialBoss2$',  group: Atlas boss,      name: The Black Star}
+  - {match: '^MapWorldsMemoryBoss1$',      group: Atlas boss,      name: Incarnation of Fear}
+  - {match: '^MapWorldsMemoryBoss2$',      group: Atlas boss,      name: Incarnation of Neglect}
+  - {match: '^Synthesis_MapGuardian',      group: Atlas boss,      name: Synthesis guardians}
+  - {match: '^MapAtlasEncounter',          group: Atlas boss,      name: Atlas encounters}
+  - {match: '^LegionLeague',               group: League mechanic, name: Legion (Domain of Timeless Conflict)}
+  - {match: '^Incursion_Temple',           group: League mechanic, name: Incursion (Temple of Atzoatl)}
+  - {match: '^BetrayalSafeHouse',          group: League mechanic, name: Betrayal (Syndicate safehouses)}
+  - {match: '^AfflictionTown',             group: League mechanic, name: Delirium (Simulacrum)}
+  - {match: '^HarvestLeagueBoss',          group: League mechanic, name: Harvest (Sacred Grove)}
+  - {match: '^BestiaryLeague_',            group: League mechanic, name: Bestiary (beast bosses)}
+  - {match: '^AbyssLeagueBoss',            group: League mechanic, name: Abyss (Abyssal Depths)}
+  - {match: '^Breach.*Boss',               group: League mechanic, name: Breach (Breachlords)}
+  - {match: '^ChayulaLeagueTowerBoss',     group: League mechanic, name: Keepers of the Flame (Hive Colony)}
+  - {match: '^AzmeriLeagueBoss',           group: League mechanic, name: Wildwood (Crux of Nothingness)}
+  - {match: '^SettlersBoss',               group: League mechanic, name: Kingsmarch (Settlers)}
+  - {match: '^DeepwaterEncounter',         group: League mechanic, name: Fathomless Depths}
+  - {match: '^MapWorldsMemoryVault',       group: League mechanic, name: Memory Vaults (Eagon)}
+  - {match: '^ClassicTreasury',            group: League mechanic, name: Reliquary vaults (Kirac)}
+  - {match: 'Labyrinth',                   group: Activity,        name: Labyrinth}
+  - {match: '^Heist',                      group: Activity,        name: Heist}
+  - {match: '^Delve',                      group: Activity,        name: Delve}
+  - {match: '^Sanctum',                    group: Activity,        name: Sanctum}

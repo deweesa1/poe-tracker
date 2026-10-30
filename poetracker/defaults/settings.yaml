@@ -1,0 +1,48 @@
+# PoE Tracker settings.
+# Edit this file (in your data folder, see README), then restart the app.
+
+# Full path to Path of Exile's Client.txt. Leave empty to auto-detect
+# (Steam libraries and the standalone install are searched).
+log_path: ""
+
+# Time zone your PC (and therefore Client.txt) uses. Also used for "days".
+timezone: America/Chicago
+
+# Character to assume when the log has not named one yet in a login.
+current_character: RagsToRage
+
+# League to show by default in the dashboard ("" = the newest league).
+current_league: Curse of the Allflame
+
+# Where the dashboard opens: "native" (its own window) or "browser".
+window: native
+
+# Dashboard address. Only reachable from this PC.
+host: 127.0.0.1
+port: 8765
+open_browser: true
+
+# Watch the clipboard for copied maps (Ctrl+C on a map in game).
+clipboard_capture: true
+
+# A copied map is linked to the next map you open within this many minutes.
+capture_link_minutes: 10
+
+# Gaps longer than this inside a session (no log lines at all) are not
+# counted as active play time.
+idle_gap_minutes: 15
+
+# GGG API (OAuth). Off until GGG accepts new applications.
+api:
+  enabled: false
+  client_id: ""
+  contact_email: ""
+
+# League start mode: during a new league's campaign only the Campaign page is
+# shown (with Overview and Standard), then Mapping until all four Voidstones.
+league_start_mode: true
+
+# Look of the dashboard: exile (Path of Exile style) or classic.
+theme: exile
+# Exile look: give each league its own accent colour (see leagues.yaml to change one).
+league_colors: true

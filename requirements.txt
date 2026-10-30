@@ -1,0 +1,4 @@
+pyyaml>=6.0
+tzdata>=2024.1      # time zone data for Windows
+nicegui>=3.0        # the dashboard (by Zauberzeug GmbH, MIT licence)
+pywebview>=5.0      # shows the dashboard in its own window
