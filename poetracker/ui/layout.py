@@ -225,17 +225,9 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     with ui.item_section().props("avatar").style("min-width:34px"):
                         ui.icon(icon, size="20px")
                     ui.item_section(label).style("white-space:nowrap")
-        from .. import mini as mini_mod
         with ui.column().classes("q-px-md q-pt-md gap-1 w-full"):
             ui.button("Mini Tracker", icon="picture_in_picture_alt", on_click=open_mini).props(
                 "outline no-caps").classes("w-full pt-mini-btn").tooltip("A small always-on-top window for live tracking")
-            with ui.row().classes("w-full no-wrap gap-1"):
-                ui.button("Lock", icon="lock", on_click=lambda: mini_lock(True)).props(
-                    "flat dense no-caps size=sm").classes("col").tooltip("Lock the mini tracker: clicks pass through to the game")
-                ui.button("Unlock", icon="lock_open", on_click=lambda: mini_lock(False)).props(
-                    "flat dense no-caps size=sm").classes("col").tooltip("Unlock the mini tracker to move or resize it")
-            ui.label(f"or press {mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)}").classes(
-                "pt-note").style("font-size:11px;text-align:center;width:100%")
         if ls["phase"] in PHASE_PAGE:
             text = ("Campaign · finish Act 10 to open League Start Mapping" if ls["phase"] == "campaign" else
                     f"Mapping · {ls['voidstones']} of {ls['voidstones_total']} Voidstones. All four open the other dashboards")
@@ -292,19 +284,7 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
 def open_mini() -> None:
     from .. import mini as mini_mod
     mini_mod.launch_mini()
-    hk = mini_mod.hotkey_label(STATE.cfg.settings if STATE.cfg else None)
-    ui.notify(f"Opening the mini tracker… Drag it into place, then press {hk} to lock it "
-              f"(clicks pass through to the game). {hk} again unlocks it.", timeout=8000)
-
-
-def mini_lock(locked: bool) -> None:
-    from . import mini_page
-    n = mini_page.set_lock(locked)
-    if not n:
-        ui.notify("The mini tracker isn't open.", type="warning")
-    else:
-        ui.notify("Mini tracker locked: clicks pass through to the game." if locked else
-                  "Mini tracker unlocked: drag it, or resize it from the bottom-right corner.")
+    ui.notify("Opening the mini tracker… Drag it into place, then lock it with its 🔒 button.", timeout=6000)
 
 
 def update_dialog() -> None:

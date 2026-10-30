@@ -1696,9 +1696,9 @@ def settings_page():
             hk = s.get("mini_hotkey", mini_mod.DEFAULT_HOTKEY)
             ui.label(f"Its buttons (top right): 🔒 lock or unlock, ▾ collapse to just the timer and act bar, ✕ close "
                      f"(when unlocked). Locked, it stays put and doesn't take focus from the game; unlocked, drag it or "
-                     f"resize it from its bottom-right corner. {mini_mod.hotkey_label(s)} and the Lock / Unlock buttons "
-                     f"in the side menu work too. Turn on 'Clicks pass through' to have locked clicks go to the game "
-                     f"underneath instead; then unlock with the hotkey or the side menu.").classes("pt-note")
+                     f"resize it from its bottom-right corner. {mini_mod.hotkey_label(s)} also locks and unlocks it. "
+                     f"Turn on 'Clicks pass through' to have locked clicks go to the game underneath instead; then "
+                     f"unlock it with the hotkey.").classes("pt-note")
             try:
                 mj = json.loads((paths.data_dir() / "mini.json").read_text(encoding="utf-8"))
             except Exception:

@@ -259,22 +259,6 @@ def render(d: dict, live: bool) -> str:
             + (f'<div class="m-hide" data-p="4"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
 
 
-CLIENTS: set = set()     # open mini windows, so the main window can lock/unlock them
-
-
-def set_lock(locked: bool) -> int:
-    """Lock or unlock every open mini tracker (from the main window). Returns how many."""
-    n = 0
-    for c in list(CLIENTS):
-        try:
-            with c:
-                ui.run_javascript(f"ptApi('set_lock', {str(bool(locked)).lower()})")
-            n += 1
-        except Exception:
-            CLIENTS.discard(c)
-    return n
-
-
 @ui.page("/mini")
 def mini_page():
     ui.add_css(palette_css())
@@ -287,9 +271,6 @@ def mini_page():
     foot = (f'<div class="m-foot"><span class="when-locked">🔒 locked · {hk} or 🔒 to unlock</span>'
             f'<span class="when-unlocked">Drag to move · corner to resize · 🔓 to lock</span></div>'
             '<div class="m-grip" title="Drag to resize"></div>')
-    client = ui.context.client
-    CLIENTS.add(client)
-    client.on_disconnect(lambda: CLIENTS.discard(client))
     last = {"json": None}
 
     def refresh():

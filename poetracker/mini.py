@@ -4,8 +4,7 @@ mini button does this).
 
 Locked (default while playing): clicks pass through to the game and the
 window never takes focus. Unlocked: drag it, resize it, use its buttons.
-Toggle with the hotkey (mini_hotkey in settings.yaml, set in Settings), or with the
-lock button in the main window's side menu.
+Toggle with its 🔒 button or the hotkey (mini_hotkey in settings.yaml, set in Settings).
 """
 from __future__ import annotations
 
