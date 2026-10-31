@@ -103,6 +103,8 @@ class Updater:
                             "version": None, "connected": False, "busy": False, "installed": self.installed,
                             "git": self.installed or bool(shutil.which("git")), "needs_installer": False}
         self._target: str | None = None       # newest commit seen by check()
+        self.state["connected"] = self.connected()
+        self.state["version"] = self.version()
 
     # -- facts about this folder ------------------------------------------
     def connected(self) -> bool:
@@ -191,6 +193,7 @@ class Updater:
         with self.lock:
             st = self.state
             st["version"] = self.version()
+            st["connected"] = True            # an installed copy always updates from GitHub
             try:
                 head = _http(f"https://api.github.com/repos/{self.repo}/commits/{BRANCH}")
                 target = head["sha"]
