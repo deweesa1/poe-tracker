@@ -173,6 +173,61 @@ def remove_leftovers() -> None:
         pass
 
 
+def desktop_shortcut() -> tuple[bool, str]:
+    """Put a 'PoE Tracker' shortcut with the app icon on the desktop (Windows)."""
+    if sys.platform != "win32":
+        return False, "Desktop shortcuts are only made on Windows."
+    import subprocess
+    project = paths.PACKAGE_DIR.parent
+    exe = Path(sys.executable)
+    pyw = exe.parent / "pythonw.exe"
+    target = pyw if pyw.exists() else exe
+    icon = paths.PACKAGE_DIR / "ui" / "static" / "icon.ico"
+    ps = (
+        "$d=[Environment]::GetFolderPath('Desktop');"
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'PoE Tracker.lnk'));"
+        f"$s.TargetPath='{target}';$s.Arguments='-m poetracker';$s.WorkingDirectory='{project}';"
+        f"$s.IconLocation='{icon},0';$s.Description='PoE Tracker';$s.Save()"
+    )
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True,
+                           text=True, timeout=30, creationflags=0x08000000)
+    except Exception as e:
+        return False, f"Couldn't make the shortcut: {e}"
+    if r.returncode:
+        return False, "Couldn't make the shortcut: " + ((r.stderr or r.stdout).strip().splitlines() or ["unknown error"])[-1]
+    return True, "Shortcut 'PoE Tracker' added to your desktop."
+
+
+def set_window_icon(title: str, timeout: float = 30.0) -> None:
+    """Give a window (found by its title) the PoE Tracker icon instead of Python's.
+    Runs in the background; does nothing outside Windows."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    def run():
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = wintypes.HWND
+        u.LoadImageW.restype = wintypes.HANDLE
+        u.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        u.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        icon = str(paths.PACKAGE_DIR / "ui" / "static" / "icon.ico")
+        end = time.time() + timeout
+        while time.time() < end:
+            hwnd = u.FindWindowW(None, title)
+            if hwnd:
+                big, small = u.GetSystemMetrics(11) or 32, u.GetSystemMetrics(49) or 16
+                for which, size in ((1, big), (0, small)):          # ICON_BIG, ICON_SMALL
+                    h = u.LoadImageW(None, icon, 1, size, size, 0x10)   # IMAGE_ICON, LR_LOADFROMFILE
+                    if h:
+                        u.SendMessageW(hwnd, 0x80, which, h)        # WM_SETICON
+                return
+            time.sleep(0.5)
+    threading.Thread(target=run, daemon=True, name="window-icon").start()
+
+
 def safety_copy(name: str = "before-rebuild") -> Path | None:
     """A copy of the database taken just before a rebuild wipes the tables."""
     src = paths.db_path()

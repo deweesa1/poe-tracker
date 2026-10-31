@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#3a2f22"/><stop offset="1" stop-color="#14110c"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3d58b"/><stop offset=".5" stop-color="#d4a54e"/><stop offset="1" stop-color="#8f6526"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe9b0"/><stop offset=".45" stop-color="#e2b45c"/><stop offset="1" stop-color="#7d5420"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="120" fill="url(#bg)"/>
+  <circle cx="128" cy="128" r="112" fill="none" stroke="url(#gold)" stroke-width="10"/>
+  <circle cx="128" cy="128" r="96" fill="none" stroke="#6b4e24" stroke-width="2"/>
+  <!-- tracker ticks (N E S W) -->
+  <g fill="url(#gold)">
+    <path d="M128 22 l9 20 h-18 z"/><path d="M128 234 l9 -20 h-18 z"/>
+    <path d="M22 128 l20 -9 v18 z"/><path d="M234 128 l-20 -9 v18 z"/>
+  </g>
+  <!-- faceted gem -->
+  <g transform="translate(128 128)">
+    <path d="M0 -62 L62 0 L0 62 L-62 0 Z" fill="url(#gem)" stroke="#f6dc98" stroke-width="3"/>
+    <path d="M0 -62 L0 62 M-62 0 L62 0" stroke="#7d5420" stroke-width="2.5" opacity=".55"/>
+    <path d="M0 -62 L-62 0 L0 0 Z" fill="#fff3cf" opacity=".35"/>
+    <path d="M0 62 L62 0 L0 0 Z" fill="#3b2508" opacity=".35"/>
+    <circle r="9" fill="#14110c" stroke="#f6dc98" stroke-width="3"/>
+  </g>
+</svg>

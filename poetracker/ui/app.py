@@ -57,7 +57,7 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     native = window == "native"
     kwargs = dict(
         title="PoE Tracker", dark=True, reload=False, show_welcome_message=False,
-        favicon="🔶", port=port or int(cfg.settings.get("port") or 8765),
+        favicon=str(paths.PACKAGE_DIR / "ui" / "static" / "icon.png"), port=port or int(cfg.settings.get("port") or 8765),
         host="127.0.0.1",
     )
     if native:
@@ -79,6 +79,7 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
         size, extra = winpos.window_args()
         app.native.window_args.update(extra)
         winpos.track(app)
+        service.set_window_icon("PoE Tracker")
         ui.run(native=True, window_size=size, **kwargs)
     else:
         ui.run(show=bool(cfg.settings.get("open_browser", True)) and window != "headless", **kwargs)

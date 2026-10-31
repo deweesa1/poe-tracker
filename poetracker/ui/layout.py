@@ -22,8 +22,8 @@ NAV = [
     ("/currency", "Currency", "paid"),
     ("/trades", "Trades", "swap_horiz"),
     ("/standard", "Standard", "insights"),
-    ("/settings", "Settings", "settings"),
 ]
+SETTINGS = ("/settings", "Settings", "settings")
 
 
 class State:
@@ -186,17 +186,39 @@ def locked(path: str):
 
 
 def status_text() -> tuple[str, str, str]:
+    """(state, text, tooltip); state is ok / busy / problem."""
     st = STATE.tracker.status() if STATE.tracker else {}
     if not st.get("log_found"):
-        return "red", "Client.txt not found", "Set the path on the Settings page."
+        return "problem", "Client.txt not found", "Set the path on the Settings page."
     if st.get("error"):
-        return "red", "Problem reading the log", st["error"]
+        return "problem", "Problem reading the log", st["error"]
     if st.get("phase") != "live":
         p = st.get("progress")
-        return "amber", f"{st.get('phase', '').capitalize()}{f' {p:.0%}' if p is not None else ''}…", ""
-    return ("green", f"Tracking · last in-game activity {fmt.ago(st.get('last_event_utc'))}",
-            "The tracker is reading Client.txt live. This is how long ago the game last wrote "
+        return "busy", f"{st.get('phase', '').capitalize()}{f' {p:.0%}' if p is not None else ''}…", ""
+    return ("ok", f"Reading Client.txt · last activity {fmt.ago(st.get('last_event_utc'))}",
+            "The tracker reads the game's log file as it's written. This is how long ago the game last wrote "
             "something the tracker uses (entering an area, a level-up, a death...).")
+
+
+STATUS_ICON = {"ok": ("auto_stories", "var(--ex-gold, #d9a441)"), "busy": ("hourglass_top", "#e0a050"),
+               "problem": ("report", "#e06050")}
+
+
+def version_line() -> tuple[str, str, bool]:
+    """(text, tooltip, update_ready) for the version shown at the bottom of the side menu."""
+    up = STATE.updater.state if STATE.updater else {}
+    ver = (up.get("version") or "").split(" · ")
+    short = ver[0] if ver and ver[0] else None
+    if up.get("available"):
+        n = up.get("behind") or 0
+        return (f"Update ready · {n} change{'s' if n != 1 else ''}", f"Your version: {up.get('version') or '?'}", True)
+    if not up.get("connected"):
+        return ("Not linked to GitHub", "Settings → Updates connects it", False)
+    if up.get("error"):
+        return (f"Version {short or '?'} · couldn't check", up["error"], False)
+    if not up.get("checked"):
+        return (f"Version {short or '?'} · checking…", up.get("version") or "", False)
+    return (f"Version {short or '?'} · up to date", up.get("version") or "", False)
 
 
 def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):
@@ -211,10 +233,11 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
     ui.dark_mode(True)
     ui.colors(primary=primary, secondary="#4fb3a5", accent="#a68bd6", dark="#1d1916", dark_page="#14110f")
 
-    with ui.left_drawer(value=True, fixed=True).props("width=252 bordered breakpoint=700").classes("q-pa-none"):
-        with ui.row().classes("items-center gap-3 q-px-md q-pt-lg q-pb-md"):
-            ui.html('<div style="width:14px;height:14px;background:var(--lg, #d9a441);transform:rotate(45deg);border-radius:2px;'
-                    'box-shadow:0 0 12px var(--lg-a50, rgba(217,164,65,.5))"></div>')
+    with ui.left_drawer(value=True, fixed=True).props("width=252 bordered breakpoint=700").classes(
+            "q-pa-none column no-wrap"):
+        with ui.row().classes("items-center gap-3 q-px-md q-pt-lg q-pb-md no-wrap"):
+            ui.html('<img src="/static/icon.svg" alt="" style="width:30px;height:30px;display:block;'
+                    'filter:drop-shadow(0 0 6px rgba(217,164,65,.35))">')
             ui.label("PoE Tracker").classes("text-weight-bold")
         ls = league_start()
         with ui.list().classes("pt-nav w-full"):
@@ -239,6 +262,29 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                 for c in chars:
                     if c:
                         ui.label(c).classes("pt-note").style("font-size:12px;color:#ece4d8")
+        ui.space()
+        with ui.column().classes("w-full gap-1 q-pb-md q-pt-sm").style("border-top:1px solid var(--ex-line-dim, #2d2722)"):
+            with ui.list().classes("pt-nav w-full"):
+                href, label, icon = SETTINGS
+                with ui.item(on_click=lambda: ui.navigate.to(href)).classes("active" if href == path else ""):
+                    with ui.item_section().props("avatar").style("min-width:34px"):
+                        ui.icon(icon, size="20px")
+                    ui.item_section(label).style("white-space:nowrap")
+            ver_box = ui.row().classes("w-full q-px-md items-center no-wrap gap-2")
+
+            def draw_version():
+                text, tip, ready = version_line()
+                ver_box.clear()
+                with ver_box:
+                    if ready:
+                        ui.button(text, icon="system_update", on_click=update_dialog).props(
+                            "dense unelevated no-caps size=sm color=primary text-color=dark").classes("w-full").tooltip(tip)
+                    else:
+                        ui.icon("verified" if "up to date" in text else "info", size="15px").style(
+                            "color:var(--ex-muted, #a69b8c)")
+                        ui.label(text).classes("pt-note").style("font-size:11.5px;line-height:1.3").tooltip(tip)
+            draw_version()
+            ui.timer(10, draw_version)
 
     with ui.header().classes("items-center q-px-lg q-py-sm gap-4"):
         with ui.column().classes("gap-0"):
@@ -260,19 +306,13 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     ui.badge("DEV" + (f" · {d['league']} · {d.get('phase') or 'auto'}" if d else ""),
                              color="deep-orange").props("outline").tooltip(
                         "Developer mode. League Start can be forced in Settings → Developer.")
-                ui.icon("circle", size="10px", color=color)
+                icon, col = STATUS_ICON[color]
+                ui.icon(icon, size="16px").style(f"color:{col}")
                 lbl = ui.label(text)
                 if tip:
                     lbl.tooltip(tip)
-                ui.button(icon="picture_in_picture_alt", on_click=open_mini).props(
-                    "flat round dense size=sm").tooltip("Open the mini tracker (always on top)")
                 if STATE.updater:
                     STATE.updater.check_soon()          # while the window is open, at most every 90 s
-                up = STATE.updater.state if STATE.updater else {}
-                if up.get("available"):
-                    ui.button(f"Update available ({up['behind']})", icon="system_update",
-                              on_click=update_dialog).props("dense unelevated size=sm color=primary text-color=dark").classes(
-                        "q-px-sm")
                 if STATE.tracker and STATE.tracker.status().get("clipboard"):
                     ui.icon("content_paste", size="16px").tooltip(
                         "Map capture is on: Ctrl+C on a map in game saves it (see Maps → Detailed Maps).")

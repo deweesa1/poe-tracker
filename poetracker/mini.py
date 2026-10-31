@@ -255,6 +255,8 @@ def run_mini() -> int:
     def started():
         if win32:
             hwnd_box["h"] = win32.find(TITLE)
+            from .service import set_window_icon
+            set_window_icon(TITLE)
         time.sleep(1.0)                # let the page load before telling it the lock state
         apply()
         hk = parse_hotkey(s.get("mini_hotkey", DEFAULT_HOTKEY))

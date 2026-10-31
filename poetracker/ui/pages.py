@@ -1537,169 +1537,37 @@ def settings_page():
     from .. import paths
     s = STATE.cfg.settings
     with body:
-        with ui.row().classes("w-full gap-4 items-start pt-wrap"):
-            with card("Tracker", "flex-[3]"):
-                log_in = ui.input("Client.txt path (empty = find automatically)", value=s.get("log_path") or "").props(
-                    "outlined dense dark").classes("w-full")
-                with ui.row().classes("w-full gap-3"):
-                    tz = ui.input("Time zone", value=s.get("timezone")).props("outlined dense dark")
-                    ch = ui.input("Main character", value=s.get("current_character") or "").props("outlined dense dark")
-                    lgi = ui.select(STATE.league_names(), value=s.get("current_league") if s.get("current_league") in STATE.league_names() else None,
-                                    label="Default league").props("outlined dense dark").style("min-width:220px")
-                with ui.row().classes("w-full gap-3 items-center"):
-                    win = ui.select({"native": "Own window", "browser": "Web browser"}, value=s.get("window", "native"),
-                                    label="Open the dashboard in").props("outlined dense dark").style("min-width:200px")
-                    capm = ui.number("Link detailed map within (min)", value=s.get("capture_link_minutes", 10)).props("outlined dense dark")
-                    clip = ui.switch("Clipboard map capture", value=bool(s.get("clipboard_capture", True)))
-                with ui.row().classes("w-full gap-3 items-center"):
-                    def set_theme(e):
-                        config_mod.save_settings({"theme": e.value})
-                        STATE.cfg.settings["theme"] = e.value
-                        _reload()
-                    ui.select({"exile": "Exile (Path of Exile style)", "classic": "Classic"}, value=s.get("theme", "exile"),
-                              label="Look", on_change=set_theme).props("outlined dense dark").style("min-width:240px")
+        with card("General"):
+            log_in = ui.input("Client.txt path (empty = find it automatically)", value=s.get("log_path") or "").props(
+                "outlined dense dark").classes("w-full")
+            with ui.row().classes("w-full gap-3 items-center"):
+                tz = ui.input("Time zone", value=s.get("timezone")).props("outlined dense dark")
+                win = ui.select({"native": "Own window", "browser": "Web browser"}, value=s.get("window", "native"),
+                                label="Open the dashboard in").props("outlined dense dark").style("min-width:200px")
+                clip = ui.switch("Save maps I copy in game (Ctrl+C)", value=bool(s.get("clipboard_capture", True)))
 
-                def save():
-                    config_mod.save_settings({
-                        "log_path": (log_in.value or "").strip(), "timezone": (tz.value or "").strip() or "America/Chicago",
-                        "current_character": (ch.value or "").strip(), "current_league": lgi.value or "",
-                        "window": win.value, "capture_link_minutes": int(capm.value or 10), "clipboard_capture": bool(clip.value),
-                    })
-                    ui.notify("Saved. Restart the tracker for changes to apply.", type="positive")
-                with ui.row().classes("w-full"):
-                    ui.space()
-                    ui.button("Save", on_click=save).props("unelevated")
-            with card("Status", "flex-[2]"):
-                st = STATE.tracker.status() if STATE.tracker else {}
-                for k, v in [
-                    ("Client.txt", st.get("log_path") or "not found"),
-                    ("Read", f"{(st.get('log_offset') or 0) / 1048576:,.1f} of {(st.get('log_size') or 0) / 1048576:,.1f} MB"),
-                    ("Last in-game activity", f"{fmt.when(st.get('last_event_utc'))} ({fmt.ago(st.get('last_event_utc'))})"),
-                    ("Clipboard capture", "running" if st.get("clipboard") else "off"),
-                    ("Data folder", str(paths.data_dir())),
-                    ("Config files", str(paths.config_dir())),
-                ]:
-                    with ui.row().classes("w-full no-wrap gap-2"):
-                        ui.label(k).classes("pt-note").style("min-width:150px")
-                        ui.label(v).classes("text-sm").style("word-break:break-all")
-        from .layout import dev_mode
-        if dev_mode():
-            with card("Developer"):
-                ui.label("Force League Start to any league and phase, to test the League Start pages, the menu "
-                         "locking and the mini tracker without waiting for a league launch. Only shown when the "
-                         "tracker is started with Start PoE Tracker (dev).bat (or dev_mode: true in settings.yaml). "
-                         "Your data isn't changed.").classes("pt-sub")
-                d = dict(STATE.pref("dev_league_start") or {})
-                lgs = {"": "Automatic (newest league)", **{n: n for n in STATE.league_names()}}
-                phases = {"": "Automatic (from your data)", "campaign": "Campaign", "mapping": "Mapping",
-                          "done": "Finished (everything open)"}
+            def save():
+                config_mod.save_settings({
+                    "log_path": (log_in.value or "").strip(), "timezone": (tz.value or "").strip() or "America/Chicago",
+                    "window": win.value, "clipboard_capture": bool(clip.value),
+                })
+                ui.notify("Saved. Restart the tracker for changes to apply.", type="positive")
 
-                def set_dev(key, value):
-                    cur = dict(STATE.pref("dev_league_start") or {})
-                    cur[key] = value or None
-                    STATE.set_pref("dev_league_start", cur if cur.get("league") else {})
-                    _reload()
-                with ui.row().classes("items-center gap-3 q-mt-sm"):
-                    ui.select(lgs, value=d.get("league") or "", label="League",
-                              on_change=lambda e: set_dev("league", e.value)).props("dense outlined dark").style("min-width:240px")
-                    ui.select(phases, value=d.get("phase") or "", label="Phase",
-                              on_change=lambda e: set_dev("phase", e.value)).props("dense outlined dark").style("min-width:220px")
-                note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
-                     "shows. The pages keep working out their own numbers, so a finished league still shows where its "
-                     "league start ended. Set League back to Automatic to stop forcing.")
-        with card("League Start"):
-            ls = league_start()
-            phase = ls.get("real_phase") or ls.get("phase")
-            days = int(STATE.cfg.settings.get("league_start_days", 14) or 14)
-            ui.label("League start is the opening stretch of a league. From launch until your first character finishes "
-                     "Act 10, only Overview, League Start Campaign, Standard and Settings are shown; the Campaign page "
-                     "stops counting at that Act 10 finish. Then League Start Mapping is added, and it stops counting at "
-                     f"your fourth Voidstone or {days} days after launch, whichever comes first. At that point every "
-                     "dashboard opens and both League Start pages stay frozen as a record, with a league picker for past "
-                     "leagues. This follows the newest league below that has started.").classes("pt-sub")
-            cur = ls.get("league")
-            status = {"campaign": "Campaign phase",
-                      "mapping": f"Mapping phase ({ls.get('voidstones')} of 4 Voidstones" +
-                                 (f", ends {fmt.when(ls['end_utc'])} at the latest)" if ls.get("end_utc") else ")"),
-                      "done": "League start finished" + (f" {fmt.when(ls['end_utc'])}" if ls.get("end_utc") else "")
-                      }.get(phase, "Off")
-            if ls.get("off"):
-                status = "Off"
-            elif ls.get("unlocked"):
-                status += " · all dashboards opened early"
-            ui.label(f"{cur or 'No league has started'} · {status}").classes("q-mt-sm text-sm")
-            if ls.get("campaign_name"):
-                ui.label(f"League Start Campaign is locked to {ls['campaign_name']}"
-                         + (f" · League Start Mapping is locked to {ls['mapping_name']}" if ls.get("mapping_name") else "")
-                         + ". The first character to finish the campaign, and the first to run a T16 map.").classes("pt-note")
-
-            def set_mode(e):
-                config_mod.save_settings({"league_start_mode": bool(e.value)})
-                STATE.cfg.settings["league_start_mode"] = bool(e.value)
-                _reload()
-
-            def unlock(on: bool):
-                STATE.set_pref("ls_unlocked", cur if on else None)
-                _reload()
-            def set_days(e):
-                try:
-                    n = max(1, min(int(e.value or 14), 120))
-                except (TypeError, ValueError):
-                    return
-                config_mod.save_settings({"league_start_days": n})
-                STATE.cfg.settings["league_start_days"] = n
-                STATE.invalidate()
-            with ui.row().classes("items-center gap-4 q-mt-sm"):
-                ui.number("Longest league start (days)", value=days, min=1, max=120, step=1, format="%d",
-                          on_change=set_days).props("outlined dense dark debounce=800").style("width:230px")
-                ui.switch("League start mode", value=bool(STATE.cfg.settings.get("league_start_mode", True)), on_change=set_mode)
-                if not ls.get("off") and phase in ("campaign", "mapping"):
-                    if ls.get("unlocked"):
-                        ui.button("Lock again", on_click=lambda: unlock(False)).props("outline")
-                    else:
-                        ui.button(f"Open all dashboards for {cur}", on_click=lambda: unlock(True)).props("outline")
-
-            ui.label("Add the next league before it launches so new characters land in it. Start time is your local time.").classes(
-                "pt-sub q-mt-md")
-            with ui.row().classes("items-end gap-3"):
-                nm = ui.input("League name").props("outlined dense dark").style("min-width:220px")
-                dt = ui.input("Start date", placeholder="2026-12-04").props("outlined dense dark")
-                tm = ui.input("Start time", value="14:00").props("outlined dense dark").style("max-width:110px")
-
-                def add():
-                    from datetime import datetime
-                    try:
-                        local = datetime.strptime(f"{(dt.value or '').strip()} {(tm.value or '').strip()}", "%Y-%m-%d %H:%M")
-                    except ValueError:
-                        ui.notify("Date as YYYY-MM-DD and time as HH:MM, please.", type="warning")
-                        return
-                    if not (nm.value or "").strip():
-                        ui.notify("Give the league a name.", type="warning")
-                        return
-                    config_mod.add_league(nm.value.strip(), local.replace(tzinfo=fmt.TZ))
-                    import threading
-
-                    def work():
-                        STATE.tracker.reload_config()
-                        STATE.cfg = STATE.tracker.cfg
-                        STATE.invalidate()
-                    threading.Thread(target=work, daemon=True).start()
-                    ui.notify(f"Added {nm.value.strip()}. Rebuilding so characters are sorted into the right league.", type="positive")
-                ui.button("Add league", on_click=add).props("unelevated")
-            lgs = list(reversed(STATE.cfg.leagues))[:4]
-            ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
-                "pt-note q-mt-sm")
+            def shortcut():
+                from .. import service
+                ok, text = service.desktop_shortcut()
+                ui.notify(text, type="positive" if ok else "negative")
+            with ui.row().classes("w-full items-center gap-3 q-mt-sm"):
+                ui.button("Save", on_click=save).props("unelevated")
+                ui.button("Create desktop shortcut", icon="add_to_home_screen", on_click=shortcut).props("outline").tooltip(
+                    "A PoE Tracker shortcut with its own icon on your desktop (you can pin it to the taskbar)")
         with card("Mini Tracker"):
-            ui.label("A small always-on-top window with your live campaign timer, splits, next boss and trial "
-                     "(or Voidstones and next milestones while mapping). Use the game in windowed or borderless "
-                     "fullscreen so it can sit over it.").classes("pt-sub")
+            ui.label("A small always-on-top window with your live timer and progress. Play in windowed or borderless "
+                     "fullscreen so it can sit over the game.").classes("pt-sub")
             from .. import mini as mini_mod
             hk = s.get("mini_hotkey", mini_mod.DEFAULT_HOTKEY)
-            ui.label(f"Its buttons (top right): 🔒 lock or unlock, ▾ collapse to just the timer and act bar, ✕ close "
-                     f"(when unlocked). Locked, it stays put and doesn't take focus from the game; unlocked, drag it or "
-                     f"resize it from its bottom-right corner. {mini_mod.hotkey_label(s)} also locks and unlocks it. "
-                     f"Turn on 'Clicks pass through' to have locked clicks go to the game underneath instead; then "
-                     f"unlock it with the hotkey.").classes("pt-note")
+            ui.label(f"🔒 locks it in place, ▾ collapses it, ✕ closes it. {mini_mod.hotkey_label(s)} also locks and "
+                     f"unlocks it.").classes("pt-note")
             try:
                 mj = json.loads((paths.data_dir() / "mini.json").read_text(encoding="utf-8"))
             except Exception:
@@ -1775,6 +1643,85 @@ document.addEventListener('keydown', onKey, true);
                 ui.button("Open mini tracker", icon="picture_in_picture_alt", on_click=open_mini).props("unelevated")
                 ui.button("Save", on_click=save_mini).props("outline")
                 ui.button("Reset position", on_click=reset_pos).props("flat")
+        with card("League Start"):
+            ls = league_start()
+            phase = ls.get("real_phase") or ls.get("phase")
+            days = int(STATE.cfg.settings.get("league_start_days", 14) or 14)
+            ui.label("Campaign pages only until your first character finishes Act 10, then League Start Mapping until "
+                     f"your 4th Voidstone or {days} days after launch. After that every dashboard opens and both League "
+                     "Start pages stay as a record of that league start.").classes("pt-sub")
+            cur = ls.get("league")
+            status = {"campaign": "Campaign phase",
+                      "mapping": f"Mapping phase ({ls.get('voidstones')} of 4 Voidstones" +
+                                 (f", ends {fmt.when(ls['end_utc'])} at the latest)" if ls.get("end_utc") else ")"),
+                      "done": "League start finished" + (f" {fmt.when(ls['end_utc'])}" if ls.get("end_utc") else "")
+                      }.get(phase, "Off")
+            if ls.get("off"):
+                status = "Off"
+            elif ls.get("unlocked"):
+                status += " · all dashboards opened early"
+            ui.label(f"{cur or 'No league has started'} · {status}").classes("q-mt-sm text-sm")
+            if ls.get("campaign_name"):
+                ui.label(f"League Start Campaign is locked to {ls['campaign_name']}"
+                         + (f" · League Start Mapping is locked to {ls['mapping_name']}" if ls.get("mapping_name") else "")
+                         + ". The first character to finish the campaign, and the first to run a T16 map.").classes("pt-note")
+
+            def set_mode(e):
+                config_mod.save_settings({"league_start_mode": bool(e.value)})
+                STATE.cfg.settings["league_start_mode"] = bool(e.value)
+                _reload()
+
+            def unlock(on: bool):
+                STATE.set_pref("ls_unlocked", cur if on else None)
+                _reload()
+            def set_days(e):
+                try:
+                    n = max(1, min(int(e.value or 14), 120))
+                except (TypeError, ValueError):
+                    return
+                config_mod.save_settings({"league_start_days": n})
+                STATE.cfg.settings["league_start_days"] = n
+                STATE.invalidate()
+            with ui.row().classes("items-center gap-4 q-mt-sm"):
+                ui.number("Longest league start (days)", value=days, min=1, max=120, step=1, format="%d",
+                          on_change=set_days).props("outlined dense dark debounce=800").style("width:230px")
+                ui.switch("League start mode", value=bool(STATE.cfg.settings.get("league_start_mode", True)), on_change=set_mode)
+                if not ls.get("off") and phase in ("campaign", "mapping"):
+                    if ls.get("unlocked"):
+                        ui.button("Lock again", on_click=lambda: unlock(False)).props("outline")
+                    else:
+                        ui.button(f"Open all dashboards for {cur}", on_click=lambda: unlock(True)).props("outline")
+
+            ui.label("Add the next league before it launches so new characters land in it. Start time is your local time.").classes(
+                "pt-sub q-mt-md")
+            with ui.row().classes("items-end gap-3"):
+                nm = ui.input("League name").props("outlined dense dark").style("min-width:220px")
+                dt = ui.input("Start date", placeholder="2026-12-04").props("outlined dense dark")
+                tm = ui.input("Start time", value="14:00").props("outlined dense dark").style("max-width:110px")
+
+                def add():
+                    from datetime import datetime
+                    try:
+                        local = datetime.strptime(f"{(dt.value or '').strip()} {(tm.value or '').strip()}", "%Y-%m-%d %H:%M")
+                    except ValueError:
+                        ui.notify("Date as YYYY-MM-DD and time as HH:MM, please.", type="warning")
+                        return
+                    if not (nm.value or "").strip():
+                        ui.notify("Give the league a name.", type="warning")
+                        return
+                    config_mod.add_league(nm.value.strip(), local.replace(tzinfo=fmt.TZ))
+                    import threading
+
+                    def work():
+                        STATE.tracker.reload_config()
+                        STATE.cfg = STATE.tracker.cfg
+                        STATE.invalidate()
+                    threading.Thread(target=work, daemon=True).start()
+                    ui.notify(f"Added {nm.value.strip()}. Rebuilding so characters are sorted into the right league.", type="positive")
+                ui.button("Add league", on_click=add).props("unelevated")
+            lgs = list(reversed(STATE.cfg.leagues))[:4]
+            ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
+                "pt-note q-mt-sm")
         with card("Updates"):
             from nicegui import run as ng_run
             upd = STATE.updater
@@ -1831,23 +1778,61 @@ document.addEventListener('keydown', onKey, true);
                     ui.button("Connect to GitHub", icon="link", on_click=connect).props("unelevated")
                 else:
                     ui.button("Check for updates", icon="sync", on_click=check_now).props("outline")
-                ui.switch("Check automatically (every 30 min)", value=bool(s.get("update_check", True)), on_change=set_auto)
-        with card("Rebuild"):
-            ui.label("Recalculates everything from the raw lines already stored. Use it after editing areas.yaml or "
-                     "log_patterns.yaml. \"Re-read Client.txt\" starts from the very beginning of the log file "
-                     "(about 15 seconds per 200 MB). Detailed maps and currency snapshots are kept.").classes("pt-sub")
+                ui.switch("Check automatically", value=bool(s.get("update_check", True)), on_change=set_auto)
+        from .layout import dev_mode as _dev
+        with ui.expansion("Advanced", icon="tune", value=_dev()).classes("w-full pt-card").props("dense header-class=text-weight-bold"):
+            with ui.column().classes("w-full gap-4 q-pt-sm"):
+                with card("Status"):
+                    st = STATE.tracker.status() if STATE.tracker else {}
+                    for k, v in [
+                        ("Client.txt", st.get("log_path") or "not found"),
+                        ("Read", f"{(st.get('log_offset') or 0) / 1048576:,.1f} of {(st.get('log_size') or 0) / 1048576:,.1f} MB"),
+                        ("Last in-game activity", f"{fmt.when(st.get('last_event_utc'))} ({fmt.ago(st.get('last_event_utc'))})"),
+                        ("Clipboard capture", "running" if st.get("clipboard") else "off"),
+                        ("Data folder", str(paths.data_dir())),
+                        ("Config files", str(paths.config_dir())),
+                    ]:
+                        with ui.row().classes("w-full no-wrap gap-2"):
+                            ui.label(k).classes("pt-note").style("min-width:150px")
+                            ui.label(v).classes("text-sm").style("word-break:break-all")
+                with card("Rebuild"):
+                    ui.label("Recalculates everything from the raw lines already stored. Use it after editing areas.yaml or "
+                             "log_patterns.yaml. \"Re-read Client.txt\" starts from the very beginning of the log file "
+                             "(about 15 seconds per 200 MB). Detailed maps and currency snapshots are kept.").classes("pt-sub")
 
-            def rebuild(from_log):
-                import threading
-                threading.Thread(target=STATE.tracker.rebuild, kwargs={"from_log": from_log}, daemon=True).start()
-                STATE.invalidate()
-                ui.notify("Rebuild started. The status at the top shows progress.")
-            with ui.row().classes("q-mt-sm"):
-                ui.button("Rebuild from stored lines", on_click=lambda: rebuild(False)).props("outline")
-                ui.button("Re-read Client.txt", on_click=lambda: rebuild(True)).props("outline")
-        with card("GGG API"):
-            ui.label("Stash currency, gear, gems and the full passive tree need GGG's OAuth API. GGG isn't accepting new "
-                     "developer applications right now, so this stays off. Everything else works from your log.").classes("pt-sub")
+                    def rebuild(from_log):
+                        import threading
+                        threading.Thread(target=STATE.tracker.rebuild, kwargs={"from_log": from_log}, daemon=True).start()
+                        STATE.invalidate()
+                        ui.notify("Rebuild started. The status at the top shows progress.")
+                    with ui.row().classes("q-mt-sm"):
+                        ui.button("Rebuild from stored lines", on_click=lambda: rebuild(False)).props("outline")
+                        ui.button("Re-read Client.txt", on_click=lambda: rebuild(True)).props("outline")
+                from .layout import dev_mode
+                if dev_mode():
+                    with card("Developer"):
+                        ui.label("Force League Start to any league and phase, to test the League Start pages, the menu "
+                                 "locking and the mini tracker without waiting for a league launch. Only shown when the "
+                                 "tracker is started with Start PoE Tracker (dev).bat (or dev_mode: true in settings.yaml). "
+                                 "Your data isn't changed.").classes("pt-sub")
+                        d = dict(STATE.pref("dev_league_start") or {})
+                        lgs = {"": "Automatic (newest league)", **{n: n for n in STATE.league_names()}}
+                        phases = {"": "Automatic (from your data)", "campaign": "Campaign", "mapping": "Mapping",
+                                  "done": "Finished (everything open)"}
+
+                        def set_dev(key, value):
+                            cur = dict(STATE.pref("dev_league_start") or {})
+                            cur[key] = value or None
+                            STATE.set_pref("dev_league_start", cur if cur.get("league") else {})
+                            _reload()
+                        with ui.row().classes("items-center gap-3 q-mt-sm"):
+                            ui.select(lgs, value=d.get("league") or "", label="League",
+                                      on_change=lambda e: set_dev("league", e.value)).props("dense outlined dark").style("min-width:240px")
+                            ui.select(phases, value=d.get("phase") or "", label="Phase",
+                                      on_change=lambda e: set_dev("phase", e.value)).props("dense outlined dark").style("min-width:220px")
+                        note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
+                             "shows. The pages keep working out their own numbers, so a finished league still shows where its "
+                             "league start ended. Set League back to Automatic to stop forcing.")
 
 
 # ====================================================================== warm-up
