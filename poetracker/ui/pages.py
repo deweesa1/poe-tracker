@@ -1533,21 +1533,32 @@ def settings_page():
                                 label="Open the dashboard in").props("outlined dense dark").style("min-width:200px")
                 clip = ui.switch("Save maps I copy in game (Ctrl+C)", value=bool(s.get("clipboard_capture", True)))
 
-            def save():
+            def save(restart: bool = False):
                 config_mod.save_settings({
                     "log_path": (log_in.value or "").strip(), "timezone": (tz.value or "").strip() or "America/Chicago",
                     "window": win.value, "clipboard_capture": bool(clip.value),
                 })
-                ui.notify("Saved. Restart the tracker for changes to apply.", type="positive")
+                if not restart:
+                    ui.notify("Saved. Restart the tracker for changes to apply.", type="positive")
+                    return
+                from nicegui import app
+                from .. import updater as updater_mod
+                ui.notify("Saved. Restarting the tracker…", type="positive")
+                updater_mod.restart_app()          # reopens the same way (dev mode stays dev mode)
+                ui.timer(0.8, app.shutdown, once=True)
 
             def shortcut():
                 from .. import service
                 ok, text = service.desktop_shortcut()
                 ui.notify(text, type="positive" if ok else "negative")
             with ui.row().classes("w-full items-center gap-3 q-mt-sm"):
-                ui.button("Save", on_click=save).props("unelevated")
-                ui.button("Create desktop shortcut", icon="add_to_home_screen", on_click=shortcut).props("outline").tooltip(
-                    "A PoE Tracker shortcut with its own icon on your desktop (you can pin it to the taskbar)")
+                ui.button("Save and restart", icon="restart_alt", on_click=lambda: save(True)).props("unelevated").tooltip(
+                    "Saves these settings and reopens the tracker so they take effect")
+                ui.button("Save", on_click=lambda: save(False)).props("outline")
+                from .. import updater as _upd
+                if not _upd.installed_copy():      # the installer already makes Start menu / desktop shortcuts
+                    ui.button("Create desktop shortcut", icon="add_to_home_screen", on_click=shortcut).props("flat").tooltip(
+                        "A PoE Tracker shortcut with its own icon on your desktop (you can pin it to the taskbar)")
         with card("Mini Tracker"):
             ui.label("A small always-on-top window with your live timer and progress. Play in windowed or borderless "
                      "fullscreen so it can sit over the game.").classes("pt-sub")
