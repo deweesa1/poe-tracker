@@ -205,8 +205,11 @@ class Snapshotter:
     """Watches for league start milestones and takes snapshots; also runs the
     "Snapshot now" requests from the Characters page."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, stamp=None):
         self.cfg = cfg
+        self._stamp = stamp or (lambda: None)     # changes when new game data is read
+        self._last_stamp = object()
+        self._waiting = False                      # a milestone is waiting out its delay
         self.state: dict = {"busy": None, "last": None, "error": None, "done": 0}
         self._manual: list[tuple[str, str | None]] = []
         self._kick = threading.Event()
@@ -263,6 +266,11 @@ class Snapshotter:
                 self._run(con, ch, lg, "manual", "Snapshot by you", None)
             if not self.auto:
                 return
+            stamp = self._stamp()
+            if stamp == self._last_stamp and not self._waiting:
+                return                                # nothing new in the log: nothing to look for
+            self._last_stamp = stamp
+            self._waiting = False
             league = metrics.current_league(self.cfg)
             done, errs = set(), {}
             for trig, ch, status, ts in con.execute(
@@ -275,13 +283,17 @@ class Snapshotter:
             for t in metrics.snapshot_triggers(con, self.cfg, league):
                 k = (t["key"], t["character"])
                 n, last = errs.get(k, (0, None))
-                if k in done or n >= 3 or (last and _age_s(last) < 300):
+                if k in done or n >= 3:
+                    continue
+                if last and _age_s(last) < 300:
+                    self._waiting = True                  # try again a little later
                     continue                      # taken, or failed: up to 3 tries, 5 minutes apart
                 age = _age_s(t["event_utc"])
                 if age > FRESH_S and k not in self._seen:
                     continue                      # it happened while the tracker wasn't watching
                 self._seen.add(k)
                 if age < DELAY_S:
+                    self._waiting = True
                     continue                      # give the game a moment to save the character
                 self._run(con, t["character"], league, t["key"], t["label"], t["event_utc"])
         finally:

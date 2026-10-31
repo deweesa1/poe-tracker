@@ -272,9 +272,9 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-atlas.pt-tree { height: max(520px, calc(100vh - 320px)); }
 .pt-tree-load, .pt-tree-load svg { width: 100%; height: 100%; display: block; }
 /* atlas passive tree */
-.pt-atlas { position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
+.pt-atlas { contain: strict; position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
   border-radius: 3px; overflow: hidden; touch-action: none; user-select: none; }
-.pt-atlas svg.pt-atlas-svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.pt-atlas svg.pt-atlas-svg { width: 100%; height: 100%; display: block; cursor: grab; will-change: transform; }
 .pt-atlas svg.pt-atlas-svg.grab { cursor: grabbing; }
 .pt-atlas .l0 { fill: none; stroke: #3a3630; stroke-width: 11; }
 .pt-atlas .l1 { fill: none; stroke: #6d5f45; stroke-width: 12; }

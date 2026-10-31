@@ -47,7 +47,8 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
         STATE.updater.start_background()
     STATE.load_prefs()
     from .. import profile
-    STATE.snaps = profile.Snapshotter(cfg)
+    STATE.snaps = profile.Snapshotter(cfg, stamp=lambda: (lambda st: (st.get("last_event_utc"), st.get("data_gen")))(
+        tracker.status()))
     STATE.snaps.start()
     app.on_shutdown(tracker.stop.set)
 

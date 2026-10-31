@@ -1125,15 +1125,28 @@ def character_page():
         sel["id"] = cid
         STATE.set_pref("character_page", cid)
         picker.refresh()
+        top.refresh()
+        snaps.refresh()
         detail.refresh()
 
+    def data(cid):
+        return STATE.cached(("character", cid), lambda c: {**metrics.character_detail(c, cid),
+                                                           "campaign": metrics.campaign_for(c, cid)}, league=lg)
+
     @ui.refreshable
-    def detail():
+    def snaps():
+        """Snapshots don't come from the log, so this part isn't redrawn while you play."""
+        cid = sel["id"]
+        if cid:
+            from . import snapshots
+            snapshots.section(data(cid)["character"]["name"], lg)
+
+    @ui.refreshable
+    def top():
         cid = sel["id"]
         if not cid:
             return empty("No characters in this league yet.")
-        d = STATE.cached(("character", cid), lambda c: {**metrics.character_detail(c, cid), "campaign": metrics.campaign_for(c, cid)},
-                         league=lg)
+        d = data(cid)
         ch = d["character"]
         ui.label(f"{ch['name']} · {ch['class'] or ''} · level {ch['level'] or '?'} · first seen {fmt.date(ch['first_seen'])}").classes("pt-h2 q-mt-sm")
         cp = d["campaign"]
@@ -1145,8 +1158,13 @@ def character_page():
             ("Deaths", fmt.num(d["death_count"])),
             ("Passive changes", fmt.num(d["tree"]["change_count"]), f"{d['tree']['count']} points known now"),
         ])
-        from . import snapshots
-        snapshots.section(ch["name"], lg)
+
+    @ui.refreshable
+    def detail():
+        cid = sel["id"]
+        if not cid:
+            return
+        d = data(cid)
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Level by play time", "flex-[3]"):
                 lv = d["levels"]
@@ -1196,8 +1214,10 @@ def character_page():
             empty("No characters in this league yet.")
         else:
             picker()
+            top()
+            snaps()
             detail()
-    auto_refresh(detail.refresh)
+    auto_refresh(lambda: (top.refresh(), detail.refresh()))
 
 
 # ====================================================================== Atlas
@@ -1219,7 +1239,26 @@ def atlas_page():
             ("Changes logged", fmt.num(t["change_count"])),
             ("Tree versions mapped with", fmt.num(len([v for v in d["versions"] if v["atlas_hash"] != "-"]))),
         ])
-        _atlas_tree_card(t)
+
+    def alloc_key():
+        if not lg:
+            return None
+        t = STATE.cached(("atlas", lg), lambda c: metrics.atlas(c, STATE.cfg, lg), league=lg)["tree"]
+        return tuple(sorted(a["node_id"] for a in t["allocated"]))
+    shown = {"k": alloc_key()}
+
+    @ui.refreshable
+    def tree():
+        """The big drawing: only redrawn when your atlas points change."""
+        if lg:
+            _atlas_tree_card(STATE.cached(("atlas", lg), lambda c: metrics.atlas(c, STATE.cfg, lg), league=lg)["tree"])
+
+    @ui.refreshable
+    def rest():
+        if not lg:
+            return
+        d = STATE.cached(("atlas", lg), lambda c: metrics.atlas(c, STATE.cfg, lg), league=lg)
+        t = d["tree"]
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Points by mechanic", "flex-1"):
                 table([{"name": "group", "label": "Group", "fmt": lambda v, r: (v or "").capitalize()},
@@ -1244,9 +1283,19 @@ def atlas_page():
             ], list(reversed(d["versions"])), page_size=12)
             note("A new version starts whenever an atlas point changes. \"-\" means no atlas points were known yet.")
 
+    def on_new_data():
+        content.refresh()
+        rest.refresh()
+        k = alloc_key()
+        if k != shown["k"]:
+            shown["k"] = k
+            tree.refresh()
+
     with body:
         content()
-    auto_refresh(content.refresh)
+        tree()
+        rest()
+    auto_refresh(on_new_data)
 
 
 def _atlas_tree_card(t: dict) -> None:

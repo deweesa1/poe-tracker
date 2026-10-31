@@ -372,6 +372,8 @@ def build_shell() -> None:
         status = ui.row().classes("items-center gap-2 text-xs").style("color:var(--muted)")
 
         def draw_status():
+            if getattr(client, "pt_hidden", False):
+                return                       # nobody is looking
             color, text, tip = status_text()
             status.clear()
             with status:
@@ -401,6 +403,14 @@ def build_shell() -> None:
 
     # one listener per window for events the pages raise from the browser
     client.pt_events = {}
+    client.pt_hidden = False
+
+    def vis(e):
+        client.pt_hidden = bool(e.args)
+        cb = getattr(client, "pt_on_visible", None)
+        if not client.pt_hidden and cb:
+            cb()
+    ui.on("pt_vis", vis)
     ui.add_body_html("""<script>
 document.addEventListener("click", (e) => {
   const a = e.target.closest(".pt-actbar a");
@@ -419,7 +429,7 @@ document.addEventListener("click", (e) => {
 });
 // ---- atlas tree: scroll to zoom, drag to move, hover card (the view survives page refreshes)
 (() => {
-  let saved = null, drag = null;
+  let saved = null, drag = null, lastTip = null;
   const svgOf = (el) => el && el.closest(".pt-atlas")?.querySelector("svg.pt-atlas-svg");
   const getVB = (svg) => svg.getAttribute("viewBox").split(" ").map(Number);
   const setVB = (svg, v) => { svg.setAttribute("viewBox", v.map(n => n.toFixed(1)).join(" ")); saved = v; };
@@ -433,12 +443,14 @@ document.addEventListener("click", (e) => {
     const ox = v[0] + v[2] / 2 - r.width * s / 2, oy = v[1] + v[3] / 2 - r.height * s / 2;
     return [ox + (e.clientX - r.left) * s, oy + (e.clientY - r.top) * s, s];
   };
-  document.addEventListener("wheel", (e) => {
+  // the wheel is only taken over inside a tree (a page-wide non-passive wheel
+  // listener makes every scroll in the app wait for script)
+  const onWheel = (e) => {
     const svg = svgOf(e.target); if (!svg) return;
     e.preventDefault();
     const [x, y] = toTree(svg, e);
     zoom(svg, e.deltaY > 0 ? 1.18 : 1 / 1.18, x, y);
-  }, {passive: false});
+  };
   document.addEventListener("pointerdown", (e) => {
     const svg = svgOf(e.target); if (!svg || e.button !== 0 || e.target.closest(".pt-atlas-ctl")) return;
     drag = {svg, x: e.clientX, y: e.clientY, v: getVB(svg), s: toTree(svg, e)[2]};
@@ -446,14 +458,21 @@ document.addEventListener("click", (e) => {
   });
   document.addEventListener("pointermove", (e) => {
     const tip = document.getElementById("pt-atlas-tip");
-    if (drag) {
-      const v = drag.v;
-      setVB(drag.svg, [v[0] - (e.clientX - drag.x) * drag.s, v[1] - (e.clientY - drag.y) * drag.s, v[2], v[3]]);
+    if (drag) {                      // move the picture while dragging (cheap); redraw once on release
+      drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y;
+      drag.svg.style.transform = `translate(${drag.dx}px, ${drag.dy}px)`;
       if (tip) tip.style.display = "none";
       return;
     }
     const g = e.target.closest && e.target.closest(".pt-atlas g.nd, .pt-tipable");
-    if (!g) { if (tip) tip.style.display = "none"; return; }
+    if (!g) { if (tip) tip.style.display = "none"; lastTip = null; return; }
+    if (g === lastTip && tip && tip.style.display === "block") {
+      const r = tip.getBoundingClientRect();
+      tip.style.left = Math.min(e.clientX + 16, window.innerWidth - r.width - 8) + "px";
+      tip.style.top = Math.min(e.clientY + 16, window.innerHeight - r.height - 8) + "px";
+      return;
+    }
+    lastTip = g;
     let t = tip;
     if (!t) { t = document.createElement("div"); t.id = "pt-atlas-tip"; document.body.appendChild(t); }
     const esc = (x) => (x || "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
@@ -466,25 +485,50 @@ document.addEventListener("click", (e) => {
     t.style.left = Math.min(e.clientX + 16, W - r.width - 8) + "px";
     t.style.top = Math.min(e.clientY + 16, H - r.height - 8) + "px";
   });
-  document.addEventListener("pointerup", () => { if (drag) drag.svg.classList.remove("grab"); drag = null; });
+  document.addEventListener("pointerup", () => {
+    if (!drag) return;
+    const v = drag.v, d = drag;
+    d.svg.classList.remove("grab");
+    if (d.dx || d.dy) setVB(d.svg, [v[0] - (d.dx || 0) * d.s, v[1] - (d.dy || 0) * d.s, v[2], v[3]]);
+    d.svg.style.transform = "";
+    drag = null;
+  });
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-atlas]"); const svg = svgOf(b); if (!b || !svg) return;
     const v = getVB(svg);
     if (b.dataset.atlas === "fit") setVB(svg, svg.dataset.vb.split(" ").map(Number));
     else zoom(svg, b.dataset.atlas === "in" ? 1 / 1.4 : 1.4, v[0] + v[2] / 2, v[1] + v[3] / 2);
   });
-  new MutationObserver(() => {
-    document.querySelectorAll(".pt-tree-load[data-src]:not([data-got])").forEach(el => {
-      el.setAttribute("data-got", "1");
-      fetch(el.dataset.src).then(r => r.text()).then(t => {
-        el.innerHTML = t || '<div style="padding:16px;color:#a69b8c">No tree in this snapshot.</div>';
-      }).catch(() => { el.innerHTML = '<div style="padding:16px;color:#e06050">Could not load the tree.</div>'; });
-    });
-    const svg = document.querySelector("svg.pt-atlas-svg:not([data-seen])");
-    if (!svg) return;
-    svg.setAttribute("data-seen", "1");
+  const seeTree = (svg) => {
+    if (svg.dataset.seen) return;
+    svg.dataset.seen = "1";
+    const box = svg.closest(".pt-atlas");
+    if (box && !box.dataset.wheel) { box.dataset.wheel = "1"; box.addEventListener("wheel", onWheel, {passive: false}); }
     if (saved && location.pathname === "/atlas") setVB(svg, saved);
+  };
+  const loadTree = (el) => {
+    if (el.dataset.got) return;
+    el.dataset.got = "1";
+    fetch(el.dataset.src).then(r => r.text()).then(t => {
+      el.innerHTML = t || '<div style="padding:16px;color:#a69b8c">No tree in this snapshot.</div>';
+      const svg = el.querySelector("svg.pt-atlas-svg"); if (svg) seeTree(svg);
+    }).catch(() => { el.innerHTML = '<div style="padding:16px;color:#e06050">Could not load the tree.</div>'; });
+  };
+  // look only at what was just added (not the whole page) for trees to wire up
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1 || n.closest?.("svg.pt-atlas-svg")) continue;
+      if (n.matches(".pt-tree-load[data-src]")) loadTree(n);
+      else if (n.matches("svg.pt-atlas-svg")) seeTree(n);
+      else if (n.querySelector) {
+        n.querySelectorAll(".pt-tree-load[data-src]").forEach(loadTree);
+        n.querySelectorAll("svg.pt-atlas-svg").forEach(seeTree);
+      }
+    }
   }).observe(document.body, {childList: true, subtree: true});
+  // tell the tracker when this window is hidden (behind the game, minimised) so it
+  // doesn't redraw pages nobody is looking at
+  document.addEventListener("visibilitychange", () => emitEvent("pt_vis", document.hidden));
 })();
 </script>""")
 
@@ -604,8 +648,11 @@ def auto_refresh(refresh: Callable, every: float = 10) -> None:
     rebuild or first read finishes, reload the whole page so the filters
     (league and character lists) are refreshed too."""
     last = {"v": STATE.version(), "busy": busy()}
+    client = ui.context.client
 
     def tick():
+        if getattr(client, "pt_hidden", False):
+            return                      # window hidden: catch up when it's shown again
         b = busy()
         if last["busy"] and not b:
             STATE.invalidate()
@@ -616,4 +663,5 @@ def auto_refresh(refresh: Callable, every: float = 10) -> None:
         if v != last["v"] and not b:
             last["v"] = v
             refresh()
-    ui.timer(3 if last["busy"] else every, tick)
+    t = ui.timer(3 if last["busy"] else every, tick)
+    client.pt_on_visible = lambda: tick() if not t.is_deleted else None
