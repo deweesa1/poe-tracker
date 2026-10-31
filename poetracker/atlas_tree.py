@@ -33,6 +33,7 @@ SHEETS = ("normalActive", "normalInactive", "notableActive", "notableInactive", 
           "keystoneInactive", "wormholeActive", "wormholeInactive", "mastery", "groupBackground",
           "startNode", "frame", "atlasBackground")
 REFRESH_S = 3 * 86400                 # look for a new tree every few days
+FORMAT = 2                            # bump when build() changes, so saved layouts are rebuilt
 CREDIT = ("Atlas tree data and art © Grinding Gear Games, from their official atlastree-export; node ids linked "
           "with RePoE. PoE Tracker is unofficial and not affiliated with or endorsed by Grinding Gear Games.")
 
@@ -61,13 +62,13 @@ def _get(url: str, timeout: float = 60) -> bytes:
 
 def status() -> dict:
     """{ready, busy, error}: whether the tree can be drawn yet."""
-    return {"ready": (cache_dir() / "layout.json").exists(), "busy": _state["busy"], "error": _state["error"]}
+    return {"ready": layout() is not None, "busy": _state["busy"], "error": _state["error"]}
 
 
 def ensure() -> None:
     """Download (or refresh) the tree in the background if it's missing or old."""
     f = cache_dir() / "layout.json"
-    if _state["busy"] or (f.exists() and time.time() - f.stat().st_mtime < REFRESH_S):
+    if _state["busy"] or (f.exists() and time.time() - f.stat().st_mtime < REFRESH_S and layout() is not None):
         return
     _state["busy"] = True
     threading.Thread(target=_download, name="atlas-tree", daemon=True).start()
@@ -80,7 +81,7 @@ def _download() -> None:
         tree = json.loads(raw)
         ver = hashlib.sha1(raw).hexdigest()[:12]
         old = _read_json(d / "layout.json") or {}
-        if old.get("version") == ver:
+        if old.get("version") == ver and old.get("format") == FORMAT:
             (d / "layout.json").touch()          # unchanged: check again in a few days
             return
         for key in SHEETS:                        # only the sheets the view uses
@@ -101,7 +102,7 @@ def _download() -> None:
             log.warning("atlas tree: couldn't get RePoE ids: %s", e)
             ids = old.get("ids") or {}
         lay = build(tree, ids)
-        lay["version"] = ver
+        lay["version"], lay["format"] = ver, FORMAT
         tmp = d / "layout.json.tmp"
         tmp.write_text(json.dumps(lay, separators=(",", ":")), encoding="utf-8")
         tmp.replace(d / "layout.json")
@@ -128,7 +129,8 @@ def layout() -> dict | None:
         mt = f.stat().st_mtime
         if _state["layout"] is None or mt != _state["mtime"]:
             _state["layout"], _state["mtime"] = _read_json(f), mt
-        return _state["layout"]
+        lay = _state["layout"]
+        return lay if lay and lay.get("format") == FORMAT else None
 
 
 def _angle(orbit: int, index: int, per_orbit: list[int]) -> float:
@@ -177,9 +179,12 @@ def build(tree: dict, ids: dict) -> dict:
                 r = radii[a["orbit"]]
                 sweep = 1 if (a2 - a1) % 360 <= 180 else 0
                 d = f"M{x1:.1f} {y1:.1f}A{r} {r} 0 0 {sweep} {x2:.1f} {y2:.1f}"
+                g = groups[str(a["group"])]
+                arc = [round(g["x"], 1), round(g["y"], 1), r, a1, a2, sweep]
             else:
                 d = f"M{x1:.1f} {y1:.1f}L{x2:.1f} {y2:.1f}"
-            links.append({"a": k, "b": o, "d": d})
+                arc = None
+            links.append({"a": k, "b": o, "d": d, "p": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)], "c": arc})
 
     sprites = {}
     for key in SHEETS:

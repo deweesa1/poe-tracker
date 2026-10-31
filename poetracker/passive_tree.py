@@ -29,6 +29,7 @@ SHEETS = ("normalActive", "normalInactive", "notableActive", "notableInactive", 
           "masteryInactive", "masteryActiveSelected", "ascendancy", "startNode", "groupBackground", "frame",
           "jewel", "background")
 REFRESH_S = 3 * 86400
+FORMAT = 2                     # bump when build_layout() changes
 _state = {"busy": False, "error": None, "index": None, "mtime": 0.0, "layout": None, "lmtime": 0.0}
 
 
@@ -44,7 +45,8 @@ def _file() -> Path:
 
 def ensure() -> None:
     f, lf = _file(), cache_dir() / "layout.json"
-    if _state["busy"] or (f.exists() and lf.exists() and time.time() - lf.stat().st_mtime < REFRESH_S):
+    if _state["busy"] or (f.exists() and lf.exists() and time.time() - lf.stat().st_mtime < REFRESH_S
+                          and layout() is not None):
         return
     _state["busy"] = True
     threading.Thread(target=_download, daemon=True, name="passive-tree").start()
@@ -68,7 +70,7 @@ def _download() -> None:
         tree = json.loads(raw)
         ver = hashlib.sha1(raw).hexdigest()[:12]
         old = _read(d / "layout.json") or {}
-        if old.get("version") != ver:
+        if old.get("version") != ver or old.get("format") != FORMAT:
             for key in SHEETS:
                 z = _sheet(tree, key)
                 if not z:
@@ -77,7 +79,7 @@ def _download() -> None:
                 if not (d / name).exists() or (old.get("tags") or {}).get(name) != tag:
                     (d / name).write_bytes(_get(RAW + "assets/" + name))
             lay = build_layout(tree)
-            lay["version"] = ver
+            lay["version"], lay["format"] = ver, FORMAT
             _write(d / "layout.json", lay)
             _write(_file(), build(tree))
         else:
@@ -119,7 +121,7 @@ def build(tree: dict) -> dict:
 
 
 def build_layout(tree: dict) -> dict:
-    """Positions, links and sprites for drawing (see ui/tree_view.py)."""
+    """Positions, links and sprites for drawing (see ui/tree_scene.py)."""
     c = tree["constants"]
     radii, per = c["orbitRadii"], c["skillsPerOrbit"]
     groups, nodes = tree["groups"], tree["nodes"]
@@ -165,9 +167,13 @@ def build_layout(tree: dict) -> dict:
                 r = radii[a["orbit"]]
                 sweep = 1 if (a2 - a1) % 360 <= 180 else 0
                 dd = f"M{x1:.0f} {y1:.0f}A{r} {r} 0 0 {sweep} {x2:.0f} {y2:.0f}"
+                g = groups[str(a["group"])]
+                arc = [round(g["x"], 1), round(g["y"], 1), r, a1, a2, sweep]
             else:
                 dd = f"M{x1:.0f} {y1:.0f}L{x2:.0f} {y2:.0f}"
-            links.append({"a": k, "b": o, "d": dd, "asc": a.get("ascendancyName") or ""})
+                arc = None
+            links.append({"a": k, "b": o, "d": dd, "asc": a.get("ascendancyName") or "",
+                          "p": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)], "c": arc})
     # group backgrounds, the way the game picks them: by the largest of orbits 1-3
     bgs = []
     asc_groups = {str(n.get("group")) for n in nodes.values() if n.get("ascendancyName")}
@@ -204,7 +210,8 @@ def layout() -> dict | None:
     mt = f.stat().st_mtime
     if _state["layout"] is None or mt != _state["lmtime"]:
         _state["layout"], _state["lmtime"] = _read(f), mt
-    return _state["layout"]
+    lay = _state["layout"]
+    return lay if lay and lay.get("format") == FORMAT else None
 
 
 def index() -> dict | None:
@@ -221,5 +228,5 @@ def index() -> dict | None:
 
 
 def status() -> dict:
-    return {"ready": _file().exists() and (cache_dir() / "layout.json").exists(), "busy": _state["busy"],
+    return {"ready": _file().exists() and layout() is not None, "busy": _state["busy"],
             "error": _state["error"]}

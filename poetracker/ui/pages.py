@@ -1300,7 +1300,6 @@ def atlas_page():
 
 def _atlas_tree_card(t: dict) -> None:
     from .. import atlas_tree
-    from . import atlas_view
     atlas_tree.ensure()
     lay = atlas_tree.layout()
     if not lay:
@@ -1326,8 +1325,11 @@ def _atlas_tree_card(t: dict) -> None:
         return
     got, missing = atlas_tree.match(lay, t["allocated"])
     with card(f"Atlas Passive Tree · {len(got)} points"):
-        with ui.element("div").classes("pt-atlas w-full"):
-            ui.html(atlas_view.svg(lay, got), sanitize=False).classes("w-full h-full")
+        import hashlib
+        from urllib.parse import quote
+        k = hashlib.sha1(",".join(sorted(got)).encode()).hexdigest()[:10]
+        with ui.element("div").classes("pt-atlas pt-canvas w-full").props(
+                f'data-scene="/scene/atlas?league={quote(STATE.league() or "")}&k={k}" data-key="atlas"'):
             with ui.element("div").classes("pt-atlas-ctl"):
                 for icon, act, tip in (("add", "in", "Zoom in"), ("remove", "out", "Zoom out"),
                                        ("fit_screen", "fit", "Show the whole tree")):

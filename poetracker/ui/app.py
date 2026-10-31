@@ -58,25 +58,39 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     from .. import passive_tree
     app.add_static_files("/passivetree", str(passive_tree.cache_dir()))
 
-    @app.get("/snaptree/{snap_id}")
-    def snap_tree(snap_id: int, part: str = "main"):
-        """A snapshot's passive tree drawing (fetched by the Characters page)."""
-        from fastapi.responses import Response
+    @app.get("/scene/snap/{snap_id}")
+    def snap_scene(snap_id: int):
+        """A snapshot's passive tree as a scene for the canvas viewer (static/tree.js)."""
+        from fastapi.responses import JSONResponse
         from .. import profile
-        from . import tree_view
+        from . import tree_scene
         con = STATE.con()
         try:
             snap = profile.load(con, snap_id)
         finally:
             con.close()
         if not snap or not snap.get("passives"):
-            return Response("", media_type="image/svg+xml")
+            return JSONResponse({})
         ch = (snap.get("items") or {}).get("character") or {}
         lay = passive_tree.layout() or {}
         asc = ch.get("class") or snap.get("class") or ""
         base = (lay.get("asc_base") or {}).get(asc, asc)
-        body = tree_view.svg(snap_id, snap["passives"], base, asc, part)
-        return Response(body, media_type="image/svg+xml", headers={"Cache-Control": "max-age=86400"})
+        return JSONResponse(tree_scene.passive(snap_id, snap["passives"], base, asc) or {},
+                            headers={"Cache-Control": "max-age=3600"})
+
+    @app.get("/scene/atlas")
+    def atlas_scene(league: str, k: str = ""):
+        """The Atlas tree with your points, as a scene for the canvas viewer."""
+        from fastapi.responses import JSONResponse
+        from .. import metrics
+        from . import tree_scene
+        lay = atlas_tree.layout()
+        if not lay:
+            return JSONResponse({})
+        t = STATE.cached(("atlas", league), lambda c: metrics.atlas(c, STATE.cfg, league), league=league)["tree"]
+        got, _ = atlas_tree.match(lay, t["allocated"])
+        return JSONResponse(tree_scene.atlas(lay, got), headers={"Cache-Control": "max-age=3600"})
+
     from . import pages  # noqa: F401  (registers the pages)
     from . import mini_page  # noqa: F401  (the mini window's page)
     from . import layout

@@ -261,26 +261,61 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-snapdiff b { color: var(--ex-gold-hi); font-weight: 600; }
 .pt-snaplist { font-size: 13px; line-height: 1.45; color: var(--ex-text); }
 .pt-snaplist .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-right: 6px; }
-/* snapshot: inventory paperdoll and the character tree */
-.pt-paperdoll { display: grid; width: max-content; grid-template-columns: repeat(8, 44px); grid-template-rows: repeat(8, 44px); gap: 4px;
-  flex: none; padding: 10px; background: rgba(0,0,0,.3); border: 1px solid var(--ex-line); border-radius: 3px; }
-.pt-inv { background: radial-gradient(circle at 50% 40%, rgba(60,50,40,.55), rgba(10,9,8,.85)); border: 1px solid #3a3228;
-  display: flex; align-items: center; justify-content: center; cursor: help; overflow: hidden; }
-.pt-inv:hover { border-color: var(--ex-gold); }
-.pt-inv img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.pt-inv span { font-size: 10px; text-align: center; padding: 2px; color: var(--ex-muted); }
-.pt-atlas.pt-tree { height: max(520px, calc(100vh - 320px)); }
-.pt-tree-load, .pt-tree-load svg { width: 100%; height: 100%; display: block; }
+/* snapshot: the inventory as the game draws it, jewels, skills */
+.pt-snaphead { font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--ex-gold-hi); }
+.pt-paperdoll { position: relative; flex: none; padding: 30px 14px 14px; border-radius: 4px;
+  background: radial-gradient(ellipse at 50% 30%, #2a2a2e 0%, #141416 70%); border: 1px solid #4a4134;
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 30px rgba(0,0,0,.6); }
+.pt-paperdoll .grid { display: grid; grid-template-columns: repeat(8, 47px); grid-template-rows: repeat(8, 47px); gap: 3px; }
+.pt-inv { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: help;
+  background: linear-gradient(180deg, #0e1230 0%, #080a1c 100%); border: 1px solid #6b5a3e;
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 12px rgba(0,0,0,.8); }
+.pt-inv:hover { border-color: #e2c27a; }
+.pt-inv.empty { background: rgba(10,10,14,.6); border-color: #3a3328; cursor: default; }
+.pt-inv img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.pt-inv > span { font-size: 10px; text-align: center; padding: 2px; color: var(--ex-muted); }
+.pt-inv .sk { position: absolute; inset: 0; display: block; pointer-events: none; opacity: .92;
+  --cell: 26px; }
+.pt-inv .sk b, .pt-inv .sk i { position: absolute; }
+.pt-inv .sk b { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #8c7444;
+  background: radial-gradient(circle at 40% 35%, color-mix(in srgb, var(--sc) 55%, #fff) 0%, var(--sc) 45%, #111 100%);
+  opacity: .55; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 2px);
+  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 2px); }
+.pt-inv .sk.w2 { --cols: 2; } .pt-inv .sk.w1 { --cols: 1; }
+.pt-inv .sk b.on { opacity: 1; box-shadow: 0 0 6px var(--sc); }
+.pt-inv .sk i { background: linear-gradient(90deg, #6b5426, #e2c27a, #6b5426); border-radius: 2px; }
+.pt-inv .sk i.h { height: 5px; width: 14px; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 18px);
+  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 9px); }
+.pt-inv .sk i.v { width: 5px; height: 14px; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 9px);
+  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 18px); }
+.pt-paperdoll .set2 { display: none; }
+.pt-paperdoll.alt .set1 { display: none; } .pt-paperdoll.alt .set2 { display: flex; }
+.pt-swap { position: absolute; top: 6px; left: 14px; display: flex; gap: 3px; }
+.pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
+  background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }
+.pt-swap button.on { color: #14110f; background: #c9a35a; border-color: #e2c27a; }
+.pt-jewel { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; cursor: help;
+  font-size: 13px; line-height: 1.25; }
+.pt-jewel:hover { border-color: var(--ex-line); background: rgba(255,255,255,.03); }
+.pt-jewel img { width: 34px; height: 34px; object-fit: contain; flex: none;
+  background: radial-gradient(circle, #1d2240 0%, #0b0d1e 80%); border: 1px solid #4a4134; border-radius: 3px; }
+.pt-skill { padding: 6px 8px; border: 1px solid var(--ex-line-dim, #2d2722); border-radius: 3px; background: rgba(0,0,0,.2); }
+.pt-skill .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-bottom: 4px; }
+.pt-skill .gems { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+.pt-skill .gem { position: relative; display: flex; flex-direction: column; align-items: center; width: 64px; cursor: help; }
+.pt-skill .gem img { width: 40px; height: 40px; object-fit: contain; }
+.pt-skill .gem.sup { width: 40px; } .pt-skill .gem.sup img { width: 30px; height: 30px; opacity: .95; }
+.pt-skill .gem em { font-style: normal; font-size: 10px; font-weight: 700; color: #e8e2d4; background: rgba(0,0,0,.75);
+  border: 1px solid #3a3328; border-radius: 6px; padding: 0 4px; margin-top: -6px; z-index: 1; }
+.pt-skill .gem small { font-size: 10.5px; line-height: 1.15; color: #1ba29b; text-align: center; margin-top: 2px; }
+.pt-atlas.pt-tree { height: max(560px, calc(100vh - 240px)); }
 /* atlas passive tree */
 .pt-atlas { contain: strict; position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
   border-radius: 3px; overflow: hidden; touch-action: none; user-select: none; }
-.pt-atlas svg.pt-atlas-svg { width: 100%; height: 100%; display: block; cursor: grab; will-change: transform; }
-.pt-atlas svg.pt-atlas-svg.grab { cursor: grabbing; }
-.pt-atlas .l0 { fill: none; stroke: #3a3630; stroke-width: 11; }
-.pt-atlas .l1 { fill: none; stroke: #6d5f45; stroke-width: 12; }
-.pt-atlas .l2 { fill: none; stroke: #e2b862; stroke-width: 16; filter: drop-shadow(0 0 14px rgba(226,184,98,.55)); }
-.pt-atlas g.nd { cursor: help; }
-.pt-atlas-ctl { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px;
+.pt-atlas canvas.pt-cv { position: absolute; inset: 0; display: block; cursor: grab; touch-action: none; }
+.pt-atlas canvas.pt-cv.grab { cursor: grabbing; }
+.pt-tree-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ex-muted); }
+.pt-atlas-ctl { z-index: 2; position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px;
   background: rgba(10,9,8,.75); border: 1px solid var(--ex-line); border-radius: 18px; padding: 4px; }
 .pt-atlas-ctl .q-btn { color: var(--ex-gold-hi); }
 #pt-atlas-tip { position: fixed; z-index: 9999; display: none; max-width: 340px; pointer-events: none; padding: 10px 12px;
