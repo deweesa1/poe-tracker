@@ -54,6 +54,28 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))
     from .. import atlas_tree
     app.add_static_files("/atlastree", str(atlas_tree.cache_dir()))     # GGG's tree art, downloaded on first use
+    from .. import passive_tree
+    app.add_static_files("/passivetree", str(passive_tree.cache_dir()))
+
+    @app.get("/snaptree/{snap_id}")
+    def snap_tree(snap_id: int, part: str = "main"):
+        """A snapshot's passive tree drawing (fetched by the Characters page)."""
+        from fastapi.responses import Response
+        from .. import profile
+        from . import tree_view
+        con = STATE.con()
+        try:
+            snap = profile.load(con, snap_id)
+        finally:
+            con.close()
+        if not snap or not snap.get("passives"):
+            return Response("", media_type="image/svg+xml")
+        ch = (snap.get("items") or {}).get("character") or {}
+        lay = passive_tree.layout() or {}
+        asc = ch.get("class") or snap.get("class") or ""
+        base = (lay.get("asc_base") or {}).get(asc, asc)
+        body = tree_view.svg(snap_id, snap["passives"], base, asc, part)
+        return Response(body, media_type="image/svg+xml", headers={"Cache-Control": "max-age=86400"})
     from . import pages  # noqa: F401  (registers the pages)
     from . import mini_page  # noqa: F401  (the mini window's page)
     from . import layout

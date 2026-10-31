@@ -261,6 +261,16 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-snapdiff b { color: var(--ex-gold-hi); font-weight: 600; }
 .pt-snaplist { font-size: 13px; line-height: 1.45; color: var(--ex-text); }
 .pt-snaplist .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-right: 6px; }
+/* snapshot: inventory paperdoll and the character tree */
+.pt-paperdoll { display: grid; width: max-content; grid-template-columns: repeat(8, 44px); grid-template-rows: repeat(8, 44px); gap: 4px;
+  flex: none; padding: 10px; background: rgba(0,0,0,.3); border: 1px solid var(--ex-line); border-radius: 3px; }
+.pt-inv { background: radial-gradient(circle at 50% 40%, rgba(60,50,40,.55), rgba(10,9,8,.85)); border: 1px solid #3a3228;
+  display: flex; align-items: center; justify-content: center; cursor: help; overflow: hidden; }
+.pt-inv:hover { border-color: var(--ex-gold); }
+.pt-inv img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pt-inv span { font-size: 10px; text-align: center; padding: 2px; color: var(--ex-muted); }
+.pt-atlas.pt-tree { height: max(520px, calc(100vh - 320px)); }
+.pt-tree-load, .pt-tree-load svg { width: 100%; height: 100%; display: block; }
 /* atlas passive tree */
 .pt-atlas { position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
   border-radius: 3px; overflow: hidden; touch-action: none; user-select: none; }

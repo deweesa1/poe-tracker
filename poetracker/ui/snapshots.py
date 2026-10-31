@@ -217,41 +217,66 @@ def _show(snap: dict | None, prev: dict | None) -> None:
         ui.html('<div class="pt-snapdiff"><div class="k">Since ' + esc(prev.get("label") or "the snapshot before") +
                 "</div>" + ("".join(f"<div>{x}</div>" for x in lines) or "<div>No changes.</div>") + "</div>").classes("w-full")
 
-    # ---- gear
-    cells = ""
-    for key, label in SLOTS:
-        it = by.get(key)
-        if not it:
-            continue
+    # ---- gear: laid out like the in-game inventory, with GGG's item art
+    def inv(it, area):
+        name = it.get("name") or ""
+        base = it.get("typeLine") or it.get("baseType") or ""
         gems = _gems(it)
-        cells += (f'<div class="pt-item" title="{esc(_mods_tip(it))}">'
-                  f'<div class="sl">{label}</div>'
-                  f'<div class="nm" style="color:{RARITY.get(it.get("frameType"), "#c8c8c8")}">{esc(_item_name(it))}</div>'
-                  + (f'<div class="gm">{esc(" · ".join(gems))}</div>' if gems else "") + "</div>")
+        icon = it.get("icon") or ""
+        return (f'<div class="pt-inv pt-tipable" style="grid-area:{area}" data-n="{esc(name or base)}" '
+                f'data-b="{esc(base if name else "")}" data-c="{RARITY.get(it.get("frameType"), "#c8c8c8")}" '
+                f'data-s="{esc(_mods_tip(it))}" data-a="{esc(" · ".join(gems))}">'
+                + (f'<img src="{esc(icon)}" alt="" loading="lazy">' if icon else f'<span>{esc(name or base)}</span>')
+                + "</div>")
+    cells = ""
+    for key, area in (("Weapon", "1 / 1 / 5 / 3"), ("Helm", "1 / 4 / 3 / 6"), ("Amulet", "2 / 6 / 3 / 7"),
+                      ("Offhand", "1 / 7 / 5 / 9"), ("BodyArmour", "3 / 4 / 6 / 6"), ("Ring", "4 / 3 / 5 / 4"),
+                      ("Ring2", "4 / 6 / 5 / 7"), ("Gloves", "5 / 1 / 7 / 3"), ("Belt", "6 / 4 / 7 / 6"),
+                      ("Boots", "5 / 7 / 7 / 9")):
+        if by.get(key):
+            cells += inv(by[key], area)
     flasks = sorted((i for i in items if i.get("inventoryId") == "Flask"), key=lambda i: i.get("x", 0))
     for it in flasks:
-        cells += (f'<div class="pt-item" title="{esc(_mods_tip(it))}"><div class="sl">Flask</div>'
-                  f'<div class="nm" style="color:{RARITY.get(it.get("frameType"), "#c8c8c8")}">{esc(_item_name(it))}</div></div>')
-    ui.html(f'<div class="pt-gear">{cells}</div>').classes("w-full")
+        col = 3 + int(it.get("x", 0))
+        cells += inv(it, f"7 / {col} / 9 / {col + 1}")
+    skills = ""
+    for key, label in SLOTS:
+        it = by.get(key)
+        gems = _gems(it) if it else []
+        if gems:
+            skills += f'<div class="pt-snaplist"><span class="k">{label}</span> {esc(" · ".join(gems))}</div>'
+    with ui.row().classes("w-full gap-6 items-start pt-wrap q-mt-sm"):
+        ui.html(f'<div class="pt-paperdoll">{cells}</div>')
+        with ui.column().classes("gap-1").style("flex:1 1 300px;min-width:0"):
+            ui.label("Skills").classes("text-weight-bold")
+            ui.html(skills or '<div class="pt-note">No gems.</div>')
+            jewels = (snap.get("passives") or {}).get("items") or []
+            if jewels:
+                ui.label(f"Jewels · {len(jewels)}").classes("text-weight-bold q-mt-sm")
+                ui.html("".join(f'<div class="pt-snaplist pt-tipable" data-n="{esc(_item_name(j))}" '
+                                f'data-c="{RARITY.get(j.get("frameType"), "#c8c8c8")}" data-s="{esc(_mods_tip(j))}" '
+                                f'style="color:{RARITY.get(j.get("frameType"), "#c8c8c8")};cursor:help">{esc(_item_name(j))}</div>'
+                                for j in jewels))
 
-    # ---- passives and jewels
-    jewels = (snap.get("passives") or {}).get("items") or []
+    # ---- the passive tree and the ascendancy, drawn like the game
     asc = (snap["items"].get("character") or {}).get("class") or snap.get("class") or ""
-    with ui.row().classes("w-full gap-4 items-start pt-wrap q-mt-sm"):
-        with ui.column().classes("gap-1").style("flex:2 1 380px;min-width:0"):
-            ui.label(f"Passive tree · {ps['points']} points" + (f" · {ps['asc']} ascendancy ({asc})" if ps["asc"] else "")).classes(
-                "text-weight-bold")
-            if not ps["known"]:
-                ui.label("Getting passive names from GGG's tree export…").classes("pt-note")
-            for title, names in (("Keystones", ps["keystones"]), ("Ascendancy", ps["asc_notables"]),
-                                 ("Notables", ps["notables"]), ("Masteries", ps["masteries"])):
-                if names:
-                    ui.html(f'<div class="pt-snaplist"><span class="k">{title}</span> {esc(" · ".join(names))}</div>')
-        with ui.column().classes("gap-1").style("flex:1 1 260px;min-width:0"):
-            ui.label(f"Jewels · {len(jewels)}").classes("text-weight-bold")
-            for j in jewels:
-                ui.html(f'<div class="pt-snaplist" title="{esc(_mods_tip(j))}" style="color:'
-                        f'{RARITY.get(j.get("frameType"), "#c8c8c8")}">{esc(_item_name(j))}</div>')
+    head = f"Passive tree · {ps['points']} points" + (f" · {ps['asc']} ascendancy ({asc})" if ps["asc"] else "")
+    ui.label(head).classes("text-weight-bold q-mt-md")
+    if not passive_tree.status()["ready"]:
+        ui.label("Getting the passive tree from GGG's official export (once, a few MB)… reopen this in a moment.").classes("pt-note")
+    elif snap.get("passives"):
+        with ui.row().classes("w-full gap-4 items-start pt-wrap"):
+            for part, style in (("main", "flex:3 1 520px"), ("asc", "flex:1 1 300px;max-width:440px")):
+                with ui.element("div").classes("pt-atlas pt-tree").style(style + (";height:440px" if part == "asc" else "")):
+                    ui.html(f'<div class="pt-tree-load" data-src="/snaptree/{snap["id"]}?part={part}"></div>',
+                            sanitize=False).classes("w-full h-full")
+                    with ui.element("div").classes("pt-atlas-ctl"):
+                        for icon, act in (("add", "in"), ("remove", "out"), ("fit_screen", "fit")):
+                            ui.button(icon=icon).props(f'flat round dense size=sm data-atlas="{act}"')
+        note("Scroll to zoom, drag to move, hover a point or item for what it does. Tree and item art © Grinding Gear Games.")
+    for title, names in (("Keystones", ps["keystones"]), ("Masteries", ps["masteries"])):
+        if names:
+            ui.html(f'<div class="pt-snaplist"><span class="k">{title}</span> {esc(" · ".join(names))}</div>')
     ui.label(f"Read from your profile {fmt.when(snap['ts_utc'])}"
              + (" (nothing had changed, so this shows the snapshot before)" if snap.get("status") == "same" else "")).classes(
         "pt-note q-mt-sm")

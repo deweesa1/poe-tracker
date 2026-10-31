@@ -452,12 +452,13 @@ document.addEventListener("click", (e) => {
       if (tip) tip.style.display = "none";
       return;
     }
-    const g = e.target.closest && e.target.closest(".pt-atlas g.nd");
+    const g = e.target.closest && e.target.closest(".pt-atlas g.nd, .pt-tipable");
     if (!g) { if (tip) tip.style.display = "none"; return; }
     let t = tip;
     if (!t) { t = document.createElement("div"); t.id = "pt-atlas-tip"; document.body.appendChild(t); }
     const esc = (x) => (x || "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
-    t.innerHTML = `<b>${esc(g.dataset.n)}</b>` +
+    t.innerHTML = `<b style="${g.dataset.c ? "color:" + g.dataset.c : ""}">${esc(g.dataset.n)}</b>` +
+      (g.dataset.b ? `<div style="color:#c8c8c8">${esc(g.dataset.b)}</div>` : "") +
       (g.dataset.s ? g.dataset.s.split("\\n").map(x => `<div>${esc(x)}</div>`).join("") : "") +
       (g.dataset.a ? `<i>${esc(g.dataset.a)}</i>` : "");
     t.style.display = "block";
@@ -473,6 +474,12 @@ document.addEventListener("click", (e) => {
     else zoom(svg, b.dataset.atlas === "in" ? 1 / 1.4 : 1.4, v[0] + v[2] / 2, v[1] + v[3] / 2);
   });
   new MutationObserver(() => {
+    document.querySelectorAll(".pt-tree-load[data-src]:not([data-got])").forEach(el => {
+      el.setAttribute("data-got", "1");
+      fetch(el.dataset.src).then(r => r.text()).then(t => {
+        el.innerHTML = t || '<div style="padding:16px;color:#a69b8c">No tree in this snapshot.</div>';
+      }).catch(() => { el.innerHTML = '<div style="padding:16px;color:#e06050">Could not load the tree.</div>'; });
+    });
     const svg = document.querySelector("svg.pt-atlas-svg:not([data-seen])");
     if (!svg) return;
     svg.setAttribute("data-seen", "1");
