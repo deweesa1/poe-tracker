@@ -228,3 +228,17 @@ document.addEventListener("click", (e) => {
   doll.classList.toggle("alt", b.dataset.set === "2");
   doll.querySelectorAll(".pt-swap button").forEach((x) => x.classList.toggle("on", x === b));
 });
+
+// character picker: arrows scroll the row; the mouse wheel scrolls it sideways
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".pt-cp-arrow"); if (!b) return;
+  const row = b.parentElement.querySelector(".pt-cp-row");
+  row.scrollBy({ left: Number(b.dataset.cp) * row.clientWidth * 0.8 });
+});
+// arrows only when the row doesn't fit
+const ptFitRows = () => document.querySelectorAll(".pt-charpick").forEach((p) => {
+  const row = p.querySelector(".pt-cp-row"); if (!row) return;
+  p.classList.toggle("over", row.scrollWidth > row.clientWidth + 2);
+});
+new MutationObserver(ptFitRows).observe(document.body, { childList: true, subtree: true });
+window.addEventListener("resize", ptFitRows);

@@ -230,6 +230,7 @@ def section(character: str, league: str | None) -> None:
     ls = league_start()
     in_ls = ls["phase"] in ("campaign", "mapping") and ls.get("league") == league
     sel = {"id": None}
+    ui_state: dict = {}
     pref_key = f"snap:{league}:{character}"
 
     @ui.refreshable
@@ -240,46 +241,60 @@ def section(character: str, league: str | None) -> None:
         finally:
             con.close()
         ok_rows = [r for r in rows if r["status"] in ("ok", "same")]
-        with ui.row().classes("w-full items-center gap-3"):
-            if ok_rows:
-                opts = {r["id"]: f"{r['label']} · level {r['level'] or '?'} · {fmt.when(r['event_utc'])}"
-                        + (" (no change)" if r["status"] == "same" else "") for r in reversed(ok_rows)}
-                cur = STATE.pref(pref_key)
-                sel["id"] = cur if cur in opts else next(iter(opts))
-                ui.select(opts, value=sel["id"], label="Snapshot",
-                          on_change=lambda e: (STATE.set_pref(pref_key, e.value), body.refresh())).props(
-                    "outlined dense dark options-dense").style("min-width:340px")
-            if not in_ls:
-                b = ui.button("Snapshot now", icon="o_photo_camera", on_click=lambda: snap_now()).props("outline no-caps")
-                if not acct:
-                    b.disable()
-                    b.tooltip("Add your account name in Settings → Profile Snapshots first")
-            last = max(rows, key=lambda r: r["ts_utc"] or "", default=None)
-            if last and last["status"] == "error":
-                ui.label(f"Last try didn't work: {last['error']}").classes("pt-note").style("flex:1 1 260px")
-        if not ok_rows:
-            empty("No snapshots of this character yet. " + (
-                "They're taken automatically during league start." if in_ls else
-                "Press Snapshot now to save its gear, jewels and passive tree." if acct else
-                "Add your account name in Settings → Profile Snapshots to take them."))
-            return
-        try:
-            con = STATE.con()
+        snap = prev = None
+        problem = None
+        with card("Profile Snapshots"):
+            ui_state["status"] = ui.label(ui_state.get("text", "")).classes("pt-note").style(
+                "color:var(--ex-gold-hi, #e6c27a)")
+            with ui.row().classes("w-full items-center gap-3"):
+                if ok_rows:
+                    opts = {r["id"]: f"{r['label']} · level {r['level'] or '?'} · {fmt.when(r['event_utc'])}"
+                            + (" (no change)" if r["status"] == "same" else "") for r in reversed(ok_rows)}
+                    cur = STATE.pref(pref_key)
+                    sel["id"] = cur if cur in opts else next(iter(opts))
+                    ui.select(opts, value=sel["id"], label="Snapshot",
+                              on_change=lambda e: (STATE.set_pref(pref_key, e.value), body.refresh())).props(
+                        "outlined dense dark options-dense").style("min-width:340px")
+                if not in_ls:
+                    b = ui.button("Snapshot now", icon="o_photo_camera", on_click=lambda: snap_now()).props("outline no-caps")
+                    if not acct:
+                        b.disable()
+                        b.tooltip("Add your account name in Settings → Profile Snapshots first")
+                last = max(rows, key=lambda r: r["ts_utc"] or "", default=None)
+                if last and last["status"] == "error":
+                    ui.label(f"Last try didn't work: {last['error']}").classes("pt-note").style("flex:1 1 260px")
+            if not ok_rows:
+                empty("No snapshots of this character yet. " + (
+                    "They're taken automatically during league start." if in_ls else
+                    "Press Snapshot now to save its gear, jewels and passive tree." if acct else
+                    "Add your account name in Settings → Profile Snapshots to take them."))
+                return
             try:
-                snap = profile.load(con, sel["id"])
-                i = next((k for k, r in enumerate(ok_rows) if r["id"] == sel["id"]), 0)
-                prev = profile.load(con, ok_rows[i - 1]["id"]) if i > 0 else None
-            finally:
-                con.close()
-            with ui.column().classes("w-full gap-2"):
+                con = STATE.con()
+                try:
+                    snap = profile.load(con, sel["id"])
+                    i = next((k for k, r in enumerate(ok_rows) if r["id"] == sel["id"]), 0)
+                    prev = profile.load(con, ok_rows[i - 1]["id"]) if i > 0 else None
+                finally:
+                    con.close()
                 _show(snap, prev)
-        except Exception as e:                     # show what went wrong instead of a blank card
-            import logging
-            import traceback
-            logging.getLogger(__name__).exception("showing profile snapshot failed")
-            tb = traceback.extract_tb(e.__traceback__)[-1]
-            ui.label(f"Couldn't show this snapshot: {type(e).__name__}: {e} "
-                     f"({tb.name}, line {tb.lineno})").classes("pt-note").style("color:#e06050")
+            except Exception as e:
+                problem = e
+        with card("Character Build"):
+            try:
+                if problem:
+                    raise problem
+                if not snap or not snap.get("items"):
+                    empty("This snapshot has no data.")
+                else:
+                    _build(snap)
+            except Exception as e:                     # show what went wrong instead of a blank card
+                import logging
+                import traceback
+                logging.getLogger(__name__).exception("showing profile snapshot failed")
+                tb = traceback.extract_tb(e.__traceback__)[-1]
+                ui.label(f"Couldn't show this snapshot: {type(e).__name__}: {e} "
+                         f"({tb.name}, line {tb.lineno})").classes("pt-note").style("color:#e06050")
 
     watch = {"since": None}
 
@@ -288,7 +303,8 @@ def section(character: str, league: str | None) -> None:
             return
         watch["since"] = sn.state.get("done", 0)
         sn.request(character, league)
-        status.set_text("Reading your profile on pathofexile.com…")
+        ui_state["text"] = "Reading your profile on pathofexile.com…"
+        ui_state["status"].set_text(ui_state["text"])
 
     def check():                       # lives outside body() so refreshing it can't stop it
         if watch["since"] is None or not sn:
@@ -296,7 +312,7 @@ def section(character: str, league: str | None) -> None:
         if sn.state.get("done", 0) == watch["since"]:
             return
         watch["since"] = None
-        status.set_text("")
+        ui_state["text"] = ""
         last = sn.state.get("last") or {}
         if last.get("status") == "error":
             ui.notify(last.get("error"), type="warning", position="top", timeout=8000, multi_line=True)
@@ -307,15 +323,14 @@ def section(character: str, league: str | None) -> None:
         STATE.set_pref(pref_key, None)
         body.refresh()
 
-    with card("Profile Snapshots"):
-        status = ui.label("").classes("pt-note").style("color:var(--ex-gold-hi, #e6c27a)")
+    with ui.column().classes("w-full gap-4"):
         body()
         ui.timer(1.0, check)
 
 
 def _show(snap: dict | None, prev: dict | None) -> None:
+    """What changed since the snapshot before (shown in the Profile Snapshots card)."""
     if not snap or not snap.get("items"):
-        empty("This snapshot has no data.")
         return
     items = [i for i in snap["items"].get("items") or [] if i.get("inventoryId") in WORN]
     by = {_item_key(i): i for i in items}
@@ -346,6 +361,11 @@ def _show(snap: dict | None, prev: dict | None) -> None:
         ui.html('<div class="pt-snapdiff"><div class="k">Since ' + esc(prev.get("label") or "the snapshot before") +
                 "</div>" + ("".join(f"<div>{x}</div>" for x in lines) or "<div>No changes.</div>") + "</div>").classes("w-full")
 
+
+
+def _build(snap: dict) -> None:
+    """Gear, gear stats, jewels, skills and the passive tree of one snapshot."""
+    items = [i for i in snap["items"].get("items") or [] if i.get("inventoryId") in WORN]
     # ---- gear, jewels and skills
     with ui.row().classes("w-full gap-5 items-start pt-wrap q-mt-sm"):
         jewels = (snap.get("passives") or {}).get("items") or []
@@ -366,12 +386,12 @@ def _show(snap: dict | None, prev: dict | None) -> None:
             if jewels or abyss:
                 ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
                 ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
-        with ui.column().classes("gap-2").style("flex:1 1 380px;min-width:300px"):
+        with ui.column().classes("gap-2").style("flex:1 1 420px;min-width:320px"):
             ui.label("Skills").classes("pt-snaphead")
-            ui.html(_skills(items) or '<div class="pt-note">No gems.</div>')
+            ui.html(f'<div class="pt-skills">{_skills(items)}</div>' if _skills(items) else
+                    '<div class="pt-note">No gems.</div>').classes("w-full")
 
     # ---- the passive tree, with the ascendancy over it like in game
-    asc = (snap["items"].get("character") or {}).get("class") or snap.get("class") or ""
     if not passive_tree.status()["ready"]:
         ui.label("Getting the passive tree from GGG's official export (once, a few MB)… reopen this in a moment.").classes("pt-note")
     elif snap.get("passives"):

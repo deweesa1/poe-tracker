@@ -1111,15 +1111,18 @@ def character_page():
 
     @ui.refreshable
     def picker():
-        with ui.row().classes("w-full gap-3"):
-            for c in chars:
-                active = c["id"] == sel["id"]
-                with ui.element("div").classes("pt-kpi cursor-pointer").style(
-                        "flex:0 0 auto; min-width:190px;" + ("border-color:#d9a441;" if active else "")).on(
-                        "click", lambda _, cid=c["id"]: choose(cid)):
-                    ui.label(c["name"]).classes("text-weight-bold" + (" text-primary" if active else ""))
-                    ui.label(f"{c['class'] or ''} · level {c['level'] or '?'}").classes("pt-note")
-                    ui.label(f"{fmt.dur(c['active_s'], True)} played · {c['maps']} maps").classes("pt-note")
+        """One scrolling row of characters (any number fits; arrows and the wheel scroll it)."""
+        with ui.element("div").classes("pt-charpick w-full"):
+            ui.html('<button class="pt-cp-arrow l" data-cp="-1">‹</button>')
+            with ui.element("div").classes("pt-cp-row"):
+                for c in chars:
+                    active = c["id"] == sel["id"]
+                    with ui.element("div").classes("pt-cp" + (" on" if active else "")).on(
+                            "click", lambda _, cid=c["id"]: choose(cid)):
+                        ui.label(c["name"]).classes("n")
+                        ui.label(f"{c['class'] or ''} · {c['level'] or '?'}").classes("c")
+                        ui.label(f"{fmt.dur(c['active_s'], True)} · {c['maps']} maps").classes("m")
+            ui.html('<button class="pt-cp-arrow r" data-cp="1">›</button>')
 
     def choose(cid):
         sel["id"] = cid

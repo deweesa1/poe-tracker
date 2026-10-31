@@ -261,6 +261,24 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-snapdiff b { color: var(--ex-gold-hi); font-weight: 600; }
 .pt-snaplist { font-size: 13px; line-height: 1.45; color: var(--ex-text); }
 .pt-snaplist .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-right: 6px; }
+/* Characters: one scrolling row of characters */
+.pt-charpick { position: relative; }
+.pt-cp-row { display: flex; gap: 8px; overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity;
+  padding: 2px 34px 6px; scroll-padding: 0 34px; scrollbar-width: thin; }
+.pt-cp { flex: 0 0 auto; scroll-snap-align: start; min-width: 168px; padding: 9px 14px; cursor: pointer; border-radius: 3px;
+  border: 1px solid var(--ex-line); background: linear-gradient(180deg, var(--ex-panel), var(--ex-panel-2));
+  transition: border-color .12s, background .12s; }
+.pt-cp:hover { border-color: #6b5a3e; }
+.pt-cp.on { border-color: var(--ex-gold); background: linear-gradient(180deg, rgba(201,163,90,.16), rgba(201,163,90,.05)); }
+.pt-cp .n { font-weight: 700; font-size: 14px; color: var(--ex-text); white-space: nowrap; }
+.pt-cp.on .n { color: var(--ex-gold-hi); }
+.pt-cp .c, .pt-cp .m { font-size: 12px; color: var(--ex-muted); white-space: nowrap; line-height: 1.35; }
+.pt-cp-arrow { position: absolute; top: 2px; bottom: 6px; z-index: 2; width: 28px; cursor: pointer; font-size: 22px;
+  color: var(--ex-gold-hi); background: var(--ex-bg-2, #14110f); border: 1px solid var(--ex-line); border-radius: 3px; }
+.pt-cp-arrow.l { left: 0; } .pt-cp-arrow.r { right: 0; }
+.pt-charpick:not(.over) .pt-cp-arrow { display: none; }
+.pt-charpick:not(.over) .pt-cp-row { padding-left: 0; padding-right: 0; }
+.pt-cp-arrow:hover { border-color: var(--ex-gold); }
 /* Characters: the selected character's header */
 .pt-charhead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 32px; padding: 18px 24px; }
 .pt-charhead .nm { font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; letter-spacing: .03em; color: var(--ex-gold-hi); line-height: 1.15; }
@@ -276,7 +294,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-paperdoll { position: relative; flex: none; padding: 34px 18px 18px; border-radius: 4px;
   background: radial-gradient(ellipse at 50% 30%, #2a2a2e 0%, #141416 70%); border: 1px solid #4a4134;
   box-shadow: inset 0 0 0 1px #000, inset 0 0 30px rgba(0,0,0,.6); }
-.pt-paperdoll .grid { display: grid; grid-template-columns: repeat(8, 47px); grid-template-rows: repeat(8, 47px); gap: 5px; }
+.pt-paperdoll .grid { display: grid; grid-template-columns: repeat(8, 58px); grid-template-rows: repeat(8, 58px); gap: 6px; }
 .pt-inv { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: help;
   background: linear-gradient(180deg, #0e1230 0%, #080a1c 100%); border: 1px solid #6b5a3e;
   box-shadow: inset 0 0 0 1px #000, inset 0 0 12px rgba(0,0,0,.8); }
@@ -286,7 +304,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-inv > span { font-size: 10px; text-align: center; padding: 2px; color: var(--ex-muted); }
 /* sockets in the game's spirit: a bronze ring with a rim in the socket's colour and a hollow middle,
    on the cell grid (50px apart), joined by plain gold links */
-.pt-inv .sk { position: absolute; inset: 0; pointer-events: none; --p: 52px; --s: 32px;
+.pt-inv .sk { position: absolute; inset: 0; pointer-events: none; --p: 64px; --s: 38px;
   --bw: calc((var(--cols) - 1) * var(--p) + var(--s)); --bh: calc((var(--rows) - 1) * var(--p) + var(--s)); }
 .pt-inv .sk b, .pt-inv .sk i { position: absolute; }
 .pt-inv .sk b { width: var(--s); height: var(--s); border-radius: 50%; z-index: 2; box-sizing: border-box;
@@ -300,11 +318,11 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-inv .sk b.on { opacity: 1; }
 .pt-inv .sk i { z-index: 1; border-radius: 2px;
   background: linear-gradient(180deg, #3e2f1c, #9a7c4c 50%, #5a4426); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
-.pt-inv .sk i.h { height: 4px; width: var(--p);
+.pt-inv .sk i.h { height: 5px; width: var(--p);
   left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2);
-  top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2 - 2px); }
-.pt-inv .sk i.v { width: 4px; height: var(--p); background: linear-gradient(90deg, #3e2f1c, #9a7c4c 50%, #5a4426);
-  left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2 - 2px);
+  top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2 - 2.5px); }
+.pt-inv .sk i.v { width: 5px; height: var(--p); background: linear-gradient(90deg, #3e2f1c, #9a7c4c 50%, #5a4426);
+  left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2 - 2.5px);
   top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2); }
 .pt-paperdoll .set2 { display: none; }
 .pt-paperdoll.alt .set1 { display: none; } .pt-paperdoll.alt .set2 { display: flex; }
@@ -312,7 +330,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
   background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }
 .pt-swap button.on { color: #14110f; background: #c9a35a; border-color: #e2c27a; }
-.pt-jewels { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 10px; max-width: 460px; }
+.pt-jewels { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 10px; max-width: 542px; }
 .pt-jewel { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; cursor: help;
   font-size: 12.5px; line-height: 1.25; min-width: 0; }
 .pt-jewel:hover { border-color: var(--ex-line); background: rgba(255,255,255,.03); }
@@ -320,7 +338,8 @@ body, .q-page, .q-layout { color: var(--ex-text);
   background: radial-gradient(circle, #1d2240 0%, #0b0d1e 80%); border: 1px solid #4a4134; border-radius: 3px; }
 .pt-jewel span { overflow: hidden; text-overflow: ellipsis; }
 /* skills: one card per link group, gems as a chain of linked sockets */
-.pt-skill { margin-bottom: 10px; padding: 10px 14px 12px; border: 1px solid var(--ex-line); border-radius: 3px;
+.pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 10px; width: 100%; }
+.pt-skill { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--ex-line); border-radius: 3px;
   background: linear-gradient(180deg, rgba(20,18,24,.9), rgba(10,9,12,.9)); }
 .pt-skill .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-width: 0; }
 .pt-skill .hd img { width: 26px; height: 26px; object-fit: contain; }
@@ -395,7 +414,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 /* quality badge on an inventory item, and the defence totals under the inventory */
 .pt-inv u.q { position: absolute; right: 2px; bottom: 1px; z-index: 3; text-decoration: none; font-size: 10px; font-weight: 700;
   color: #b9b3e8; background: rgba(0,0,0,.65); border-radius: 3px; padding: 0 3px; }
-.pt-def { display: grid; gap: 6px; max-width: 447px; margin-bottom: 6px; }
+.pt-def { display: grid; gap: 6px; width: 542px; max-width: 100%; margin-bottom: 6px; }
 .pt-def span { display: flex; flex-direction: column; padding: 4px 10px; border: 1px solid var(--ex-line); border-radius: 3px;
   background: rgba(0,0,0,.25); font-size: 15px; font-weight: 700; color: var(--ex-text); line-height: 1.2; }
 .pt-def small { font-size: 10px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
