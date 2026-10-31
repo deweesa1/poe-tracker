@@ -6,7 +6,7 @@ import html
 
 from nicegui import ui
 
-from .. import passive_tree, profile
+from .. import icons, passive_tree, profile
 from . import fmt
 from .layout import STATE, league_start
 from .widgets import card, empty, note
@@ -73,13 +73,18 @@ def item_card(it: dict, gems_line: str = "") -> str:
     then enchant / implicit / fractured / explicit / crafted / foulborn mods, flavour and flags."""
     frame = _FRAME.get(it.get("frameType"), "normal")
     name, base = it.get("name") or "", it.get("typeLine") or it.get("baseType") or ""
-    tags = [label for k, label in _INFLUENCE.items() if (it.get("influences") or {}).get(k) or it.get(k) is True]
-    for k, label in (("fractured", "Fractured"), ("synthesised", "Synthesised"), ("mutated", "Foulborn"),
-                     ("split", "Split"), ("mirrored", "Mirrored"), ("veiled", "Veiled")):
-        if it.get(k):
-            tags.append(label)
-    head = (f'<div class="ic-head {frame}">' + (f'<div>{esc(name)}</div>' if name else "") + f'<div>{esc(base)}</div>'
-            + (f'<div class="ic-tags">{" · ".join(esc(t) for t in tags)}</div>' if tags else "") + "</div>")
+    marks = [(k, label) for k, label in _INFLUENCE.items() if (it.get("influences") or {}).get(k) or it.get(k) is True]
+    marks += [(k, label) for k, label in (("fractured", "Fractured"), ("synthesised", "Synthesised"), ("mutated", "Foulborn"),
+                                          ("split", "Split"), ("mirrored", "Mirrored"), ("veiled", "Veiled")) if it.get(k)]
+    # round symbols in the header corners like the game (influences first); the rest as text
+    syms = [k for k, _ in marks if icons.have(k)][:2]
+    left = syms[0] if syms else None
+    right = syms[1] if len(syms) > 1 else left
+    text_tags = [label for k, label in marks if k not in syms]
+    sym = (lambda k, side: f'<img class="ic-sym {side}" src="/icons/{k}.png" alt="">' if k else "")
+    head = (f'<div class="ic-head {frame}">{sym(left, "l")}{sym(right, "r")}'
+            + (f'<div>{esc(name)}</div>' if name else "") + f'<div>{esc(base)}</div>'
+            + (f'<div class="ic-tags">{" · ".join(esc(t) for t in text_tags)}</div>' if text_tags else "") + "</div>")
     blocks = []
     props = [_prop_line(p) for p in it.get("properties") or []]
     if props:
@@ -188,6 +193,7 @@ def _passive_summary(p: dict | None) -> dict:
 def section(character: str, league: str | None) -> None:
     """The Profile Snapshots card for one character."""
     passive_tree.ensure()
+    icons.ensure()
     sn = STATE.snaps
     acct = (STATE.cfg.settings or {}).get("poe_account") if STATE.cfg else ""
     ls = league_start()

@@ -358,6 +358,9 @@ body, .q-page, .q-layout { color: var(--ex-text);
 #pt-atlas-tip .ic-head.unique { color: #d0874a; background: linear-gradient(180deg, #33200f, #1f1409); }
 #pt-atlas-tip .ic-head.gem { color: #3cb8ac; background: linear-gradient(180deg, #102a28, #0a1a19); }
 #pt-atlas-tip .ic-head.relic { color: #82ad6a; background: linear-gradient(180deg, #1c2a14, #12190c); }
+#pt-atlas-tip .ic-head { position: relative; padding-left: 40px; padding-right: 40px; }
+#pt-atlas-tip .ic-sym { position: absolute; top: 50%; width: 30px; height: 30px; transform: translateY(-50%); }
+#pt-atlas-tip .ic-sym.l { left: 6px; } #pt-atlas-tip .ic-sym.r { right: 6px; }
 #pt-atlas-tip .ic-tags { font-family: Inter, sans-serif; font-size: 11px; letter-spacing: .04em; color: #c9a35a; opacity: .9; }
 #pt-atlas-tip .ic-body { padding: 8px 14px 10px; text-align: center; font-size: 13px; line-height: 1.45; }
 #pt-atlas-tip .ic-body hr { border: 0; height: 1px; margin: 6px 20px;

@@ -57,6 +57,8 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     app.add_static_files("/atlastree", str(atlas_tree.cache_dir()))     # GGG's tree art, downloaded on first use
     from .. import passive_tree
     app.add_static_files("/passivetree", str(passive_tree.cache_dir()))
+    from .. import icons
+    app.add_static_files("/icons", str(icons.cache_dir()))
 
     @app.get("/scene/snap/{snap_id}")
     def snap_scene(snap_id: int):
