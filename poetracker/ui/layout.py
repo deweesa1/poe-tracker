@@ -209,16 +209,17 @@ def version_line() -> tuple[str, str, bool]:
     up = STATE.updater.state if STATE.updater else {}
     ver = (up.get("version") or "").split(" · ")
     short = ver[0] if ver and ver[0] else None
+    when = f"Version {short}, released {ver[1]}" if len(ver) > 1 else (up.get("version") or "")
     if up.get("available"):
         n = up.get("behind") or 0
-        return (f"Update ready · {n} change{'s' if n != 1 else ''}", f"Your version: {up.get('version') or '?'}", True)
+        return (f"Update ready · {n} change{'s' if n != 1 else ''}", f"You have {when or 'an older version'}", True)
     if not up.get("connected"):
         return ("Not linked to GitHub", "Settings → Updates connects it", False)
     if up.get("error"):
         return (f"Version {short or '?'} · couldn't check", up["error"], False)
     if not up.get("checked"):
-        return (f"Version {short or '?'} · checking…", up.get("version") or "", False)
-    return (f"Version {short or '?'} · up to date", up.get("version") or "", False)
+        return (f"Version {short or '?'} · checking…", when, False)
+    return (f"Version {short or '?'} · up to date", when, False)
 
 
 def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):

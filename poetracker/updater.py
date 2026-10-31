@@ -26,8 +26,9 @@ _NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0     # don't flash a co
 
 
 def _git(*args: str, timeout: float = 60) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=PROJECT_DIR, capture_output=True, text=True, timeout=timeout,
-                          creationflags=_NO_WINDOW)
+    # git writes UTF-8; Windows would otherwise decode it as cp1252 ("Â·")
+    return subprocess.run(["git", *args], cwd=PROJECT_DIR, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout, creationflags=_NO_WINDOW)
 
 
 class Updater:
@@ -44,8 +45,9 @@ class Updater:
     def version(self) -> str | None:
         if not self.connected():
             return None
-        r = _git("log", "-1", "--format=%h · %cd", "--date=format:%b %d, %H:%M")
-        return r.stdout.strip() or None
+        r = _git("log", "-1", "--format=%h|%cd", "--date=format:%b %d, %H:%M")
+        out = r.stdout.strip()
+        return out.replace("|", " · ") if out else None
 
     # -- check / apply ----------------------------------------------------
     def check(self) -> dict:
