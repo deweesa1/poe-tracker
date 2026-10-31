@@ -1950,8 +1950,8 @@ document.addEventListener('keydown', onKey, true);
             ui.label(legal.TRADEMARKS)
             note("The Atlas tree is drawn from GGG's official "
                  "atlastree-export (downloaded the first time you open it, not shipped with the app); its node ids are "
-                 "linked with RePoE, a community export of the game data. Item influence symbols come from Path of "
-                 "Building's assets (GGG's art), downloaded on first use. Everything the tracker records stays on this PC.")
+                 "linked with RePoE, a community export of the game data. Item influence symbols (GGG's art) are fetched from GGG's "
+                 "image site or poedb.tw on first use. Everything the tracker records stays on this PC.")
 
 
 @contextmanager
