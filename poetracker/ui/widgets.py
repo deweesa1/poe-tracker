@@ -71,7 +71,7 @@ html {{ scroll-behavior: smooth; }}
   border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;
   background: var(--ex-gold, #c9a35a); color: #15120b; box-shadow: 0 0 0 3px var(--ex-bg, #14110f), 0 2px 8px rgba(0,0,0,.5); }}
 .pt-toggle:hover {{ background: var(--ex-gold-hi, #e6c27a); }}
-.pt-ver {{ align-self: stretch; margin: 6px 14px 0; padding: 14px 0 6px 5px; height: 58px; box-sizing: border-box; border-top: 1px solid var(--ex-line-dim, #2d2722); }}
+.pt-ver {{ align-self: stretch; margin: 6px 14px 0; padding: 14px 0 0 5px; height: 50px; box-sizing: border-box; border-top: 1px solid var(--ex-line-dim, #2d2722); }}
 .pt-logo {{ padding-left: 16px; padding-right: 16px; }}
 body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
 .q-drawer--mini .q-mini-drawer-hide {{ display: none !important; }}
@@ -90,7 +90,7 @@ body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
 .q-drawer--mini .pt-nav .q-item__section--avatar {{ min-width: 0 !important; padding: 0 !important; justify-content: center; }}
 .q-drawer--mini .pt-nav .q-icon {{ font-size: 19px !important; }}
 .q-drawer--mini .pt-sep {{ width: 24px; margin: 6px auto; align-self: center; }}
-.q-drawer--mini .pt-ver {{ margin: 6px auto 0; padding: 14px 0 6px; height: 58px; box-sizing: border-box; width: 24px; display: flex; justify-content: center; }}
+.q-drawer--mini .pt-ver {{ margin: 6px auto 0; padding: 14px 0 0; height: 50px; box-sizing: border-box; width: 24px; display: flex; justify-content: center; }}
 .q-drawer--mini .pt-ver > .nicegui-row {{ width: auto !important; justify-content: center; }}
 
 

@@ -304,7 +304,6 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                         ui.tooltip(f"{text} · {tip}" if tip else text).classes("text-body2")
             draw_version()
             ui.timer(10, draw_version)
-            ui.element("div").style("height:12px")
         # round button on the menu's edge, level with Settings: collapse to icons / expand
         with ui.element("div").classes("pt-toggle").on("click", toggle_mini).tooltip("Collapse / expand the menu"):
             toggle_icon = ui.icon("chevron_right" if mini else "chevron_left", size="18px")
