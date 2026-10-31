@@ -1,7 +1,7 @@
 // PoE Tracker.exe: starts the tracker with the Python that the installer put
 // next to it (python\pythonw.exe -m poetracker). No console window.
 //   --console   show a window with the tracker's messages (stays open after it exits)
-//   --dev       developer mode (Settings gets a Developer card)
+//   --dev       developer mode (only on a developer copy, or with dev_mode: true in settings.yaml)
 // Any other arguments are passed on to "python -m poetracker run".
 using System;
 using System.Diagnostics;

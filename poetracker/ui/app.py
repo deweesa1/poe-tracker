@@ -42,7 +42,7 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     STATE.cfg = cfg
     STATE.tracker = tracker
     from .. import updater as updater_mod
-    STATE.updater = updater_mod.Updater(cfg.settings.get("update_repo"))
+    STATE.updater = updater_mod.Updater(cfg.settings.get("update_repo"), cfg.settings.get("update_token"))
     if cfg.settings.get("update_check", True):
         STATE.updater.start_background()
     STATE.load_prefs()

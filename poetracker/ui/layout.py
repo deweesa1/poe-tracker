@@ -155,9 +155,13 @@ def league_start() -> dict:
 
 
 def dev_mode() -> bool:
-    """Developer mode: started with --dev (Start PoE Tracker (dev).bat) or
-    dev_mode: true in settings.yaml."""
-    return bool(STATE.dev or (STATE.cfg and STATE.cfg.settings.get("dev_mode")))
+    """Developer mode: dev_mode: true in settings.yaml, or --dev on a developer
+    (source) copy. An installed copy ignores --dev, so people who install it
+    don't stumble into it."""
+    from .. import updater as updater_mod
+    if STATE.cfg and STATE.cfg.settings.get("dev_mode"):
+        return True
+    return bool(STATE.dev and not updater_mod.installed_copy())
 
 
 def dev_override() -> dict | None:

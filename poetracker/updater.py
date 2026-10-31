@@ -47,10 +47,16 @@ def _owner_repo(url: str) -> str:
     return f"{m.group(1)}/{m.group(2)}" if m else "deweesa1/poe-tracker"
 
 
+_TOKEN: dict = {"value": None}     # a GitHub access token, for a private repository (Settings → Updates)
+
+
 def _http(url: str, timeout: float = 30, raw: bool = False):
     import urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "poe-tracker-updater",
-                                               "Accept": "application/vnd.github+json"})
+    headers = {"User-Agent": "poe-tracker-updater",
+               "Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json"}
+    if _TOKEN["value"] and url.startswith("https://api.github.com/"):
+        headers["Authorization"] = f"Bearer {_TOKEN['value']}"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         data = r.read()
     return data if raw else json.loads(data.decode("utf-8"))
@@ -80,8 +86,9 @@ def _git(*args: str, timeout: float = 60) -> subprocess.CompletedProcess:
 
 
 class Updater:
-    def __init__(self, repo_url: str | None = None):
+    def __init__(self, repo_url: str | None = None, token: str | None = None):
         self.repo_url = repo_url or DEFAULT_REPO
+        _TOKEN["value"] = (token or "").strip() or None
         self.repo = _owner_repo(self.repo_url)
         self.installed = installed_copy()
         self.lock = threading.Lock()
@@ -222,7 +229,9 @@ class Updater:
                 staged: dict[str, bytes] = {}
                 for p in todo:
                     from urllib.parse import quote
-                    data = _http(f"https://raw.githubusercontent.com/{self.repo}/{target}/{quote(p)}", timeout=60, raw=True)
+                    # through the API, so a private repository works with a token
+                    data = _http(f"https://api.github.com/repos/{self.repo}/contents/{quote(p)}?ref={target}",
+                                 timeout=60, raw=True)
                     if blob_sha(data) != remote[p]:
                         return False, f"A downloaded file didn't match GitHub's fingerprint ({p}); nothing was changed."
                     staged[p] = data
@@ -259,9 +268,12 @@ class Updater:
             finally:
                 self.state["busy"] = False
 
+    def set_token(self, token: str | None) -> None:
+        _TOKEN["value"] = (token or "").strip() or None
+
     def check_soon(self, older_than: float = 90) -> None:
         """Check in the background if the last check is older than this (seconds)."""
-        if self.installed:
+        if self.installed and not _TOKEN["value"]:
             older_than = max(older_than, 300)     # GitHub allows 60 questions an hour without an account
         st = self.state
         if st.get("busy") or self.lock.locked() or (st.get("checked") and time.time() - st["checked"] < older_than):
@@ -288,6 +300,9 @@ def _short_error(e: Exception) -> str:
     if isinstance(e, urllib.error.HTTPError):
         if e.code == 403:
             return "GitHub says to slow down; it'll check again in a few minutes"
+        if e.code in (401, 404):
+            return ("GitHub won't show the project (private repository?): add an access token in Settings → Updates"
+                    if not _TOKEN["value"] else "GitHub didn't accept the access token")
         return f"GitHub answered {e.code}"
     if isinstance(e, urllib.error.URLError):
         return "couldn't reach GitHub (offline?)"

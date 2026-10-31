@@ -13,7 +13,9 @@ It never touches the game. It only reads the log file and, if you turn it on, th
 
 Uninstall from Windows Settings → Apps. Your data in `%LOCALAPPDATA%\PoETracker` is kept.
 
-The Start menu also has **PoE Tracker (with log window)**, which shows the app's messages, and **PoE Tracker (dev)** (developer mode: Settings gets a *Developer* card that forces League Start to any league and phase).
+The Start menu also has **PoE Tracker (with log window)**, which shows the app's messages.
+
+Developer mode (a *Developer* card in Settings that forces League Start to any league and phase) is for development copies: `tools\Start PoE Tracker (dev).bat`. An installed copy only turns it on with `dev_mode: true` in its `settings.yaml`.
 
 ## Run from source (development)
 

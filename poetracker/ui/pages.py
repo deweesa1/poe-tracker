@@ -1777,6 +1777,25 @@ document.addEventListener('keydown', onKey, true);
                 else:
                     ui.button("Check for updates", icon="sync", on_click=check_now).props("outline")
                 ui.switch("Check automatically", value=bool(s.get("update_check", True)), on_change=set_auto)
+            if upd and upd.installed:
+                # a private repository needs a token to read it (kept only in your local settings.yaml)
+                with ui.row().classes("items-center gap-3 q-mt-sm w-full"):
+                    tok = ui.input("GitHub access token (only while the project is private)",
+                                   value=s.get("update_token") or "", password=True, password_toggle_button=True).props(
+                        "outlined dense dark").style("min-width:min(420px, 100%)")
+
+                    async def save_token():
+                        v = (tok.value or "").strip()
+                        config_mod.save_settings({"update_token": v})
+                        STATE.cfg.settings["update_token"] = v
+                        upd.set_token(v)
+                        ui.notify("Token saved. Checking GitHub…")
+                        await ng_run.io_bound(upd.check)
+                        draw_updates()
+                    ui.button("Save token", on_click=save_token).props("outline")
+                note("Needed only while github.com/deweesa1/poe-tracker is private: make a fine-grained token on GitHub "
+                     "(Settings → Developer settings → Fine-grained tokens) with read-only Contents access to that one "
+                     "repository, and paste it here. It stays on this PC.")
         from .layout import dev_mode as _dev
         with ui.expansion("Advanced", icon="tune", value=_dev()).classes("w-full pt-card").props("dense header-class=text-weight-bold"):
             with ui.column().classes("w-full gap-4 q-pt-sm"):

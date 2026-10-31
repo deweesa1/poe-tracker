@@ -49,8 +49,11 @@ Source: "..\build\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs crea
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppUserModelID}"; Comment: "Path of Exile play tracker"
 Name: "{autoprograms}\{#AppName} (with log window)"; Filename: "{app}\{#AppExe}"; Parameters: "--console"; Comment: "PoE Tracker with a window showing its messages"
-Name: "{autoprograms}\{#AppName} (dev)"; Filename: "{app}\{#AppExe}"; Parameters: "--console --dev"; Comment: "PoE Tracker in developer mode"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon; AppUserModelID: "{#AppUserModelID}"
+
+[InstallDelete]
+; the developer-mode shortcut that version 0.1.0 added
+Type: files; Name: "{autoprograms}\{#AppName} (dev).lnk"
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch PoE Tracker"; Flags: nowait postinstall skipifsilent
