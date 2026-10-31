@@ -244,10 +244,10 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
         STATE.set_pref("drawer_mini", now)
         drawer.props(add="mini") if now else drawer.props(remove="mini")
         ui.run_javascript(f"document.body.classList.toggle('pt-mini', {str(now).lower()})")
-        toggle_icon.set_name("keyboard_double_arrow_right" if now else "keyboard_double_arrow_left")
+        toggle_icon.set_name("chevron_right" if now else "chevron_left")
 
     def nav_item(label, icon, on_click, active=False, trailing=None, tip=None):
-        with ui.item(on_click=on_click).classes("active" if active else ""):
+        with ui.item(on_click=on_click).classes("active" if active else "") as it:
             with ui.item_section().props("avatar").style("min-width:34px"):
                 ui.icon(icon, size="20px")
             ui.item_section(label).classes("q-mini-drawer-hide").style("white-space:nowrap")
@@ -257,6 +257,7 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             # names show on hover only while the menu is collapsed to icons
             ui.tooltip(tip or label).props('anchor="center right" self="center left" :offset="[10, 0]"').classes(
                 "pt-nav-tip text-body2")
+        return it
 
     with drawer:
         with ui.row().classes("items-center gap-3 q-pt-lg q-pb-md no-wrap pt-logo"):
@@ -285,8 +286,10 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             with ui.list().classes("pt-nav w-full"):
                 nav_item("Mini Tracker", "picture_in_picture_alt", open_mini, trailing="open_in_new",
                          tip="Mini Tracker (opens a window)")
+            ui.element("div").classes("pt-sep")
+            with ui.list().classes("pt-nav w-full"):
                 href, label, icon = SETTINGS
-                nav_item(label, icon, lambda: ui.navigate.to(href), active=href == path)
+                nav_item(label, icon, lambda: ui.navigate.to(href), active=href == path).classes("pt-has-toggle")
             ver_box = ui.element("div").classes("pt-ver")
 
             def draw_version():
@@ -313,10 +316,23 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                         ui.tooltip(f"{text} · {tip}" if tip else text).classes("text-body2")
             draw_version()
             ui.timer(10, draw_version)
-            with ui.row().classes("w-full q-px-md q-pb-sm pt-collapse-row"):
-                toggle_icon = ui.icon("keyboard_double_arrow_right" if mini else "keyboard_double_arrow_left",
-                                      size="20px").classes("pt-collapse cursor-pointer").on("click", toggle_mini)
-                toggle_icon.tooltip("Collapse / expand the menu")
+            ui.element("div").style("height:12px")
+        # round button on the menu's edge, level with Settings: collapse to icons / expand
+        with ui.element("div").classes("pt-toggle").on("click", toggle_mini).tooltip("Collapse / expand the menu"):
+            toggle_icon = ui.icon("chevron_right" if mini else "chevron_left", size="18px")
+        ui.add_body_html("""<script>
+(function () {
+  function place() {
+    const t = document.querySelector('.pt-toggle'), s = document.querySelector('.pt-has-toggle');
+    const d = t && t.closest('.q-drawer');
+    if (!t || !s || !d) return;
+    const r = s.getBoundingClientRect(), dr = d.getBoundingClientRect();
+    t.style.top = (r.top - dr.top + r.height / 2 - 13) + 'px';
+  }
+  window.addEventListener('resize', place);
+  setInterval(place, 400);
+})();
+</script>""")
 
     with ui.header().classes("items-center q-px-lg q-py-sm gap-4"):
         with ui.column().classes("gap-0"):
