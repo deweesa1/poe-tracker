@@ -180,8 +180,6 @@ def section(character: str, league: str | None) -> None:
         status = ui.label("").classes("pt-note").style("color:var(--ex-gold-hi, #e6c27a)")
         body()
         ui.timer(1.0, check)
-        note("From your public pathofexile.com profile. During league start they're taken at the end of each act, "
-             "then every 10 levels, your first yellow and red map, and each Voidstone. Hover an item for its mods.")
 
 
 def _show(snap: dict | None, prev: dict | None) -> None:
@@ -219,13 +217,14 @@ def _show(snap: dict | None, prev: dict | None) -> None:
 
     # ---- gear, jewels and skills
     with ui.row().classes("w-full gap-5 items-start pt-wrap q-mt-sm"):
-        ui.html(_paperdoll(items), sanitize=False)
         jewels = (snap.get("passives") or {}).get("items") or []
         abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
-        with ui.column().classes("gap-2").style("flex:0 1 250px;min-width:200px"):
-            ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
-            ui.html("".join(_jewel_row(j) for j in jewels + abyss) or '<div class="pt-note">No jewels.</div>')
-        with ui.column().classes("gap-2").style("flex:1 1 320px;min-width:280px"):
+        with ui.column().classes("gap-3").style("flex:none"):
+            ui.html(_paperdoll(items), sanitize=False)
+            if jewels or abyss:
+                ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
+                ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
+        with ui.column().classes("gap-2").style("flex:1 1 380px;min-width:300px"):
             ui.label("Skills").classes("pt-snaphead")
             ui.html(_skills(items) or '<div class="pt-note">No gems.</div>')
 
@@ -243,43 +242,42 @@ def _show(snap: dict | None, prev: dict | None) -> None:
                     ui.button(icon=icon).props(f'flat round dense size=sm data-atlas="{act}"')
         note("Scroll to zoom, drag to move, hover a point, gem or item for what it does. "
              "Tree and item art © Grinding Gear Games.")
-    ui.label(f"Read from your profile {fmt.when(snap['ts_utc'])}"
-             + (" (nothing had changed, so this shows the snapshot before)" if snap.get("status") == "same" else "")).classes(
-        "pt-note q-mt-sm")
+
 
 
 # ---- inventory, the way the game lays it out (8 x 8 cells) -----------------
 _AREAS = {"Weapon": "1 / 1 / 5 / 3", "Offhand": "1 / 7 / 5 / 9", "Weapon2": "1 / 1 / 5 / 3", "Offhand2": "1 / 7 / 5 / 9",
           "Helm": "1 / 4 / 3 / 6", "Amulet": "3 / 6 / 4 / 7", "BodyArmour": "3 / 4 / 6 / 6", "Ring": "4 / 3 / 5 / 4",
           "Ring2": "4 / 6 / 5 / 7", "Gloves": "5 / 1 / 7 / 3", "Belt": "6 / 4 / 7 / 6", "Boots": "5 / 7 / 7 / 9",
-          "Trinket": "8 / 1 / 9 / 3"}
+          "Trinket": "8 / 2 / 9 / 3"}
 _SOCKET = {"R": "#c0392b", "G": "#3f9a4a", "B": "#3b6fd1", "W": "#e8e8e8", "A": "#2b2b2b", "DV": "#888"}
+
+
+def _socket_layout(n: int, w: int) -> list[tuple[int, int]]:
+    """Where the game puts socket i: two columns snake left-right-right-left; one column goes down."""
+    if w == 1:
+        return [(i, 0) for i in range(n)]
+    return [(i // 2, (i % 2) if (i // 2) % 2 == 0 else 1 - i % 2) for i in range(n)]
 
 
 def _sockets(it: dict) -> str:
     socks = it.get("sockets") or []
     if not socks:
         return ""
-    w = 2 if (it.get("w") or 1) >= 2 else 1
+    w = 2 if (it.get("w") or 1) >= 2 and len(socks) > 1 else 1
     filled = {g.get("socket") for g in it.get("socketedItems") or []}
-    pos = []
-    for i in range(len(socks)):
-        if w == 2:
-            r, c = i // 2, (i % 2 if (i // 2) % 2 == 0 else 1 - i % 2)
-        else:
-            r, c = i, 0
-        pos.append((r, c))
+    pos = _socket_layout(len(socks), w)
+    rows = max(r for r, _ in pos) + 1
     out = ""
     for i in range(1, len(socks)):           # links between neighbours in the same group
         if socks[i].get("group") == socks[i - 1].get("group"):
             (r1, c1), (r2, c2) = pos[i - 1], pos[i]
-            horiz = r1 == r2
-            out += (f'<i class="lk {"h" if horiz else "v"}" style="--r:{min(r1, r2)};--c:{min(c1, c2)}"></i>')
+            out += f'<i class="lk {"h" if r1 == r2 else "v"}" style="--r:{min(r1, r2)};--c:{min(c1, c2)}"></i>'
     for i, sk in enumerate(socks):
         r, c = pos[i]
         col = _SOCKET.get(sk.get("sColour") or sk.get("attr") or "", "#777")
         out += f'<b class="{"on" if i in filled else ""}" style="--r:{r};--c:{c};--sc:{col}"></b>'
-    return f'<span class="sk w{w}" style="--rows:{(len(socks) + w - 1) // w}">{out}</span>'
+    return f'<span class="sk" style="--cols:{w};--rows:{rows}">{out}</span>'
 
 
 def _paperdoll(items: list[dict]) -> str:
@@ -306,7 +304,7 @@ def _paperdoll(items: list[dict]) -> str:
     for key, area in (("Weapon", "1 / 1 / 5 / 3"), ("Offhand", "1 / 7 / 5 / 9"), ("Helm", "1 / 4 / 3 / 6"),
                       ("BodyArmour", "3 / 4 / 6 / 6"), ("Gloves", "5 / 1 / 7 / 3"), ("Boots", "5 / 7 / 7 / 9"),
                       ("Belt", "6 / 4 / 7 / 6"), ("Amulet", "3 / 6 / 4 / 7"), ("Ring", "4 / 3 / 5 / 4"),
-                      ("Ring2", "4 / 6 / 5 / 7"), ("Trinket", "8 / 1 / 9 / 3")):
+                      ("Ring2", "4 / 6 / 5 / 7"), ("Trinket", "8 / 2 / 9 / 3")):
         if not by.get(key):
             html_ += f'<div class="pt-inv empty" style="grid-area:{area}"></div>'
     flasks = sorted(by.get("Flask", []), key=lambda i: i.get("x", 0))
@@ -339,35 +337,57 @@ def _gem_label(g: dict) -> str:
 
 
 def _skills(items: list[dict]) -> str:
-    """One row per linked group: gem art with level and quality, supports smaller."""
+    """One card per linked group, the gems drawn as the chain of sockets they sit in,
+    so you can see which supports are linked to which skills."""
     order = [k for k, _ in SLOTS]
-    rows = ""
+    cards = ""
     for it in sorted(items, key=lambda i: order.index(i.get("inventoryId")) if i.get("inventoryId") in order else 99):
-        gems = [g for g in it.get("socketedItems") or [] if not g.get("abyssJewel")]
-        if not gems or it.get("inventoryId") in ("Weapon2", "Offhand2"):
+        if it.get("inventoryId") in ("Weapon2", "Offhand2"):
             continue
         socks = it.get("sockets") or []
+        gems = {g.get("socket"): g for g in it.get("socketedItems") or [] if not g.get("abyssJewel")}
+        if not gems:
+            continue
         groups: dict = {}
-        for g in gems:
-            si = g.get("socket")
-            grp = socks[si].get("group") if isinstance(si, int) and si < len(socks) else 0
-            groups.setdefault(grp, []).append(g)
+        for i, sk in enumerate(socks):
+            groups.setdefault(sk.get("group", 0), []).append(i)
+        if not socks:                        # no socket info: one group
+            groups = {0: sorted(gems)}
         label = dict(SLOTS).get(it.get("inventoryId"), it.get("inventoryId") or "")
         for grp in sorted(groups):
-            gl = sorted(groups[grp], key=lambda g: bool(g.get("support")))
-            cells = ""
-            for g in gl:
+            idxs = groups[grp]
+            gl = [gems[i] for i in idxs if i in gems]
+            if not gl:
+                continue
+            actives = [g for g in gl if not g.get("support")]
+            chain = ""
+            for n, i in enumerate(idxs):
+                g = gems.get(i)
+                col = _SOCKET.get((socks[i].get("sColour") or socks[i].get("attr") or "") if i < len(socks) else "", "#777")
+                if n:
+                    chain += '<i class="lk"></i>'
+                if not g:
+                    chain += f'<span class="gs empty" style="--sc:{col}"><b></b><small>empty</small></span>'
+                    continue
                 lvl, qual = _gem_props(g)
                 sup = bool(g.get("support"))
                 props = "\n".join(f'{p.get("name")}: {", ".join(str(v[0]) for v in p.get("values") or [])}'
                                    for p in g.get("properties") or [] if p.get("name") and p.get("values"))
-                cells += (f'<span class="gem pt-tipable{" sup" if sup else ""}" data-n="{esc(g.get("typeLine") or "")}" '
+                name = g.get("typeLine") or g.get("baseType") or "?"
+                short = name.replace(" Support", "")
+                img = f'<img src="{esc(g["icon"])}" alt="" loading="lazy">' if g.get("icon") else ""
+                chain += (f'<span class="gs pt-tipable{" sup" if sup else ""}" style="--sc:{col}" data-n="{esc(name)}" '
                           f'data-c="#1ba29b" data-s="{esc(props)}" data-a="{"Support gem" if sup else "Skill gem"}">'
-                          + (f'<img src="{esc(g.get("icon") or "")}" alt="" loading="lazy">' if g.get("icon") else "")
-                          + f'<em>{esc(lvl or "?")}{("/" + esc(qual)) if qual else ""}</em>'
-                          + (f'<small>{esc(g.get("typeLine") or "")}</small>' if not sup else "") + "</span>")
-            rows += f'<div class="pt-skill"><div class="sl">{esc(label)} · {len(gl)}L</div><div class="gems">{cells}</div></div>'
-    return rows
+                          f'<b>{img}</b>'
+                          f'<em>{esc(lvl or "?")}{("/" + esc(qual) + "%") if qual else ""}</em>'
+                          f'<small>{esc(short)}</small></span>')
+            linked = len(idxs)
+            what = (", ".join(g.get("typeLine") or "?" for g in actives) or "Supports only")
+            cards += (f'<div class="pt-skill"><div class="hd">'
+                      + (f'<img src="{esc(it.get("icon") or "")}" alt="" loading="lazy">' if it.get("icon") else "")
+                      + f'<span class="sl">{esc(label)}</span><span class="ln">{linked}-Link</span>'
+                      f'<span class="wh">{esc(what)}</span></div><div class="chain">{chain}</div></div>')
+    return cards
 
 
 def _jewel_row(j: dict) -> str:

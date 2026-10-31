@@ -1166,7 +1166,7 @@ def character_page():
             return
         d = data(cid)
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
-            with card("Level by play time", "flex-[3]"):
+            with card("Level by play time", "flex-1"):
                 lv = d["levels"]
                 if lv:
                     ch_ = chart(None, [{"name": "Level", "type": "line", "color": GOLD,
@@ -1176,11 +1176,6 @@ def character_page():
                     ch_.options["tooltip"][":formatter"] = "p => 'Level ' + p[0].value[1] + ' after ' + p[0].value[0] + 'h played'"
                 else:
                     empty("No level-ups logged.")
-            with card("Playtime per day", "flex-[2]"):
-                days = d["daily"][-45:]
-                chart([fmt.day_label(x["day"]) for x in days],
-                      [{"name": "Played", "data": [round(x["active_s"] / 3600, 2) for x in days], "color": TEAL}],
-                      y="h", tooltip_fmt=HOURS_TIP, height=240)
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Deaths", "flex-1"):
                 if d["death_by_kind"]:
@@ -1191,13 +1186,6 @@ def character_page():
                     {"name": "kind", "label": "Kind", "fmt": lambda v, r: KIND.get(v, v or "")},
                     {"name": "area_level", "label": "Area level", "num": True},
                 ], d["deaths"], page_size=10, empty_text="No deaths. Nice.")
-            with card("Passive tree changes", "flex-1"):
-                table([
-                    {"name": "ts_utc", "label": "When", "fmt": lambda v, r: fmt.when(v)},
-                    {"name": "action", "label": "", "fmt": lambda v, r: "+" if v == "allocated" else "−"},
-                    {"name": "name", "label": "Node"},
-                ], d["tree"]["changes"], page_size=10, empty_text="No passive changes logged.")
-                note("Only points changed while the log was recording are known.")
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Allocated notables & keystones (known)", "flex-1"):
                 import re

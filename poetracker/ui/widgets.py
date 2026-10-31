@@ -274,40 +274,73 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-inv.empty { background: rgba(10,10,14,.6); border-color: #3a3328; cursor: default; }
 .pt-inv img { max-width: 92%; max-height: 92%; object-fit: contain; }
 .pt-inv > span { font-size: 10px; text-align: center; padding: 2px; color: var(--ex-muted); }
-.pt-inv .sk { position: absolute; inset: 0; display: block; pointer-events: none; opacity: .92;
-  --cell: 26px; }
+/* sockets as the game draws them: bronze rings on the cell grid (50px apart), gold links */
+.pt-inv .sk { position: absolute; inset: 0; pointer-events: none; --p: 50px; --s: 38px;
+  --bw: calc((var(--cols) - 1) * var(--p) + var(--s)); --bh: calc((var(--rows) - 1) * var(--p) + var(--s)); }
 .pt-inv .sk b, .pt-inv .sk i { position: absolute; }
-.pt-inv .sk b { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #8c7444;
-  background: radial-gradient(circle at 40% 35%, color-mix(in srgb, var(--sc) 55%, #fff) 0%, var(--sc) 45%, #111 100%);
-  opacity: .55; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 2px);
-  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 2px); }
-.pt-inv .sk.w2 { --cols: 2; } .pt-inv .sk.w1 { --cols: 1; }
-.pt-inv .sk b.on { opacity: 1; box-shadow: 0 0 6px var(--sc); }
-.pt-inv .sk i { background: linear-gradient(90deg, #6b5426, #e2c27a, #6b5426); border-radius: 2px; }
-.pt-inv .sk i.h { height: 5px; width: 14px; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 18px);
-  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 9px); }
-.pt-inv .sk i.v { width: 5px; height: 14px; left: calc(50% - (var(--cols, 1) * var(--cell)) / 2 + var(--c) * var(--cell) + 9px);
-  top: calc(50% - var(--rows) * var(--cell) / 2 + var(--r) * var(--cell) + 18px); }
+.pt-inv .sk b { width: var(--s); height: var(--s); border-radius: 50%; z-index: 2;
+  left: calc(50% - var(--bw) / 2 + var(--c) * var(--p)); top: calc(50% - var(--bh) / 2 + var(--r) * var(--p));
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255,255,255,.35) 0 7%, transparent 16%),
+    radial-gradient(circle, color-mix(in srgb, var(--sc) 70%, #000) 0 30%, color-mix(in srgb, var(--sc) 35%, #000) 44%, transparent 46%),
+    radial-gradient(circle, transparent 0 45%, #120d07 46%, #e2c27a 52%, #8a6a32 58%, #2a1e10 64%, #b9945a 72%, #5a4426 84%, #1a130a 100%);
+  box-shadow: 0 1px 3px rgba(0,0,0,.8); opacity: .8; }
+.pt-inv .sk b.on { opacity: 1;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255,255,255,.6) 0 7%, transparent 18%),
+    radial-gradient(circle, color-mix(in srgb, var(--sc) 85%, #fff) 0 12%, var(--sc) 30%, color-mix(in srgb, var(--sc) 45%, #000) 44%, transparent 46%),
+    radial-gradient(circle, transparent 0 45%, #120d07 46%, #e2c27a 52%, #8a6a32 58%, #2a1e10 64%, #b9945a 72%, #5a4426 84%, #1a130a 100%); }
+.pt-inv .sk i { z-index: 1; border-radius: 3px; border: 1px solid #2a1e10;
+  background: linear-gradient(180deg, #6b5426, #f0d48a 45%, #b08a4e 60%, #4a3820); }
+.pt-inv .sk i.h { height: 9px; width: var(--p);
+  left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2);
+  top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2 - 4.5px); }
+.pt-inv .sk i.v { width: 9px; height: var(--p);
+  background: linear-gradient(90deg, #6b5426, #f0d48a 45%, #b08a4e 60%, #4a3820);
+  left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2 - 4.5px);
+  top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2); }
+.pt-inv .sk i::after { content: ""; position: absolute; width: 11px; height: 11px; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(45deg); background: linear-gradient(135deg, #fff3c4, #c9a35a 50%, #6b5426);
+  border: 1px solid #2a1e10; }
+.pt-paperdoll:not(:hover) .pt-inv .sk { opacity: .9; }
 .pt-paperdoll .set2 { display: none; }
 .pt-paperdoll.alt .set1 { display: none; } .pt-paperdoll.alt .set2 { display: flex; }
 .pt-swap { position: absolute; top: 6px; left: 14px; display: flex; gap: 3px; }
 .pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
   background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }
 .pt-swap button.on { color: #14110f; background: #c9a35a; border-color: #e2c27a; }
+.pt-jewels { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px; max-width: 430px; }
 .pt-jewel { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; cursor: help;
-  font-size: 13px; line-height: 1.25; }
+  font-size: 12.5px; line-height: 1.25; min-width: 0; }
 .pt-jewel:hover { border-color: var(--ex-line); background: rgba(255,255,255,.03); }
 .pt-jewel img { width: 34px; height: 34px; object-fit: contain; flex: none;
   background: radial-gradient(circle, #1d2240 0%, #0b0d1e 80%); border: 1px solid #4a4134; border-radius: 3px; }
-.pt-skill { padding: 6px 8px; border: 1px solid var(--ex-line-dim, #2d2722); border-radius: 3px; background: rgba(0,0,0,.2); }
-.pt-skill .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-bottom: 4px; }
-.pt-skill .gems { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
-.pt-skill .gem { position: relative; display: flex; flex-direction: column; align-items: center; width: 64px; cursor: help; }
-.pt-skill .gem img { width: 40px; height: 40px; object-fit: contain; }
-.pt-skill .gem.sup { width: 40px; } .pt-skill .gem.sup img { width: 30px; height: 30px; opacity: .95; }
-.pt-skill .gem em { font-style: normal; font-size: 10px; font-weight: 700; color: #e8e2d4; background: rgba(0,0,0,.75);
-  border: 1px solid #3a3328; border-radius: 6px; padding: 0 4px; margin-top: -6px; z-index: 1; }
-.pt-skill .gem small { font-size: 10.5px; line-height: 1.15; color: #1ba29b; text-align: center; margin-top: 2px; }
+.pt-jewel span { overflow: hidden; text-overflow: ellipsis; }
+/* skills: one card per link group, gems as a chain of linked sockets */
+.pt-skill { padding: 8px 10px 10px; border: 1px solid var(--ex-line); border-radius: 3px;
+  background: linear-gradient(180deg, rgba(20,18,24,.9), rgba(10,9,12,.9)); }
+.pt-skill .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
+.pt-skill .hd img { width: 26px; height: 26px; object-fit: contain; }
+.pt-skill .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
+.pt-skill .ln { font-size: 10.5px; font-weight: 700; color: #14110f; background: #c9a35a; border-radius: 2px; padding: 0 5px; }
+.pt-skill .wh { font-size: 13px; color: #6fd3c6; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-skill .chain { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 8px; }
+.pt-skill .chain > i.lk { width: 14px; height: 8px; margin-top: 19px; flex: none; border-radius: 3px; border: 1px solid #2a1e10;
+  background: linear-gradient(180deg, #6b5426, #f0d48a 45%, #b08a4e 60%, #4a3820); }
+.pt-skill .gs { display: flex; flex-direction: column; align-items: center; width: 74px; cursor: help; }
+.pt-skill .gs b { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--sc) 40%, #000) 0 40%, transparent 42%),
+    radial-gradient(circle, transparent 0 41%, #120d07 42%, #e2c27a 50%, #8a6a32 57%, #2a1e10 64%, #b9945a 74%, #5a4426 86%, #1a130a 100%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sc) 45%, transparent); }
+.pt-skill .gs b img { width: 30px; height: 30px; object-fit: contain; }
+.pt-skill .gs.sup b { box-shadow: none; }
+.pt-skill .gs.empty b { opacity: .5; box-shadow: none; }
+.pt-skill .gs em { font-style: normal; font-size: 10px; font-weight: 700; color: #e8e2d4; background: rgba(0,0,0,.8);
+  border: 1px solid #3a3328; border-radius: 6px; padding: 0 4px; margin-top: -7px; z-index: 1; }
+.pt-skill .gs small { font-size: 11px; line-height: 1.15; text-align: center; margin-top: 3px; color: #6fd3c6; font-weight: 600; }
+.pt-skill .gs.sup small { color: #8fa8c8; font-weight: 400; }
+.pt-skill .gs.empty small { color: var(--ex-dim, #6f665a); }
 .pt-atlas.pt-tree { height: max(560px, calc(100vh - 240px)); }
 /* atlas passive tree */
 .pt-atlas { contain: strict; position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
