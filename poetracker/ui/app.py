@@ -110,6 +110,7 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
         title="PoE Tracker", dark=True, reload=False, show_welcome_message=False,
         favicon=str(paths.PACKAGE_DIR / "ui" / "static" / "icon.png"), port=port or int(cfg.settings.get("port") or 8765),
         host="127.0.0.1",
+        reconnect_timeout=20,      # a slow redraw shouldn't flash "connection lost"
     )
     if native:
         try:

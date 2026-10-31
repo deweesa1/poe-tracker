@@ -290,6 +290,9 @@ def build_shell() -> None:
                     'filter:drop-shadow(0 0 6px rgba(217,164,65,.35))">')
             ui.label("PoE Tracker").classes("text-weight-bold q-mini-drawer-hide")
         nav_list = ui.list().classes("pt-nav w-full")
+        # one update dialog per window, kept here: adding a dialog to the page itself
+        # made the whole page redraw (it jumped, and heavy pages lost the connection)
+        client.pt_update_dlg = ui.dialog()
 
         def draw_nav(path: str) -> None:
             nav_list.clear()
@@ -492,7 +495,12 @@ def update_dialog() -> None:
     up = STATE.updater.state
     # The dialog lives on the page itself, not inside the status bar (which is
     # redrawn every few seconds and would delete it mid-update).
-    with ui.context.client.content, ui.dialog() as dlg, ui.card().classes("pt-card").style("min-width:min(520px, 92vw)"):
+    dlg = getattr(ui.context.client, "pt_update_dlg", None)
+    if dlg is None:
+        with ui.context.client.content:
+            dlg = ui.dialog()
+    dlg.clear()
+    with dlg, ui.card().classes("pt-card").style("min-width:min(520px, 92vw)"):
         ui.label("Update Available").classes("pt-h2")
         ui.label(f"{up['behind']} change{'s' if up['behind'] != 1 else ''} since your version "
                  f"({up.get('version') or '?'}):").classes("pt-sub")
