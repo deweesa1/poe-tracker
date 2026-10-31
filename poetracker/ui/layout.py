@@ -60,14 +60,24 @@ class State:
     def con(self):
         return db.connect(readonly=True)
 
-    def version(self, league: str | None = None) -> tuple:
+    def version(self, league: str | None = None, fresh: bool = False) -> tuple:
         """What cached results depend on. A league that has ended can't get new
-        game data, so its results stay valid while you play (until a rebuild)."""
+        game data, so its results stay valid while you play (until a rebuild).
+        While you play the log changes every few seconds; pages only need to catch
+        up every 20 s or so, so unless `fresh` the newest-event stamp moves at most
+        that often (the mini tracker asks for fresh)."""
         st = self.tracker.status() if self.tracker else {}
         n = self._counts()
         if league and self.cfg and league != metrics.current_league(self.cfg):
             return ("past", st.get("data_gen"), st.get("phase"), tuple(n))
-        return (st.get("last_event_utc"), st.get("data_gen"), st.get("phase"), tuple(n))
+        ev = st.get("last_event_utc")
+        if not fresh:
+            now = time.monotonic()
+            ce = getattr(self, "_coarse", None)
+            if ce is None or (ev != ce[0] and now - ce[1] >= 20):
+                self._coarse = ce = (ev, now)
+            ev = ce[0]
+        return (ev, st.get("data_gen"), st.get("phase"), tuple(n))
 
     def _counts(self) -> tuple:
         """Rows you add by hand (currency, copied maps); re-read at most once a second."""
@@ -84,8 +94,8 @@ class State:
         self._counts_hit = (now, n)
         return n
 
-    def cached(self, key: tuple, fn: Callable, league: str | None = None):
-        v = self.version(league)
+    def cached(self, key: tuple, fn: Callable, league: str | None = None, fresh: bool = False):
+        v = self.version(league, fresh)
         with self._lock:
             hit = self._cache.get(key)
             if hit and hit[0] == v:
@@ -321,8 +331,13 @@ def build_shell() -> None:
                 settings_item = nav_item(label, icon, lambda: ui.navigate.to(href)).classes("pt-has-toggle")
             ver_box = ui.element("div").classes("pt-ver")
 
+            vlast: dict = {}
+
             def draw_version():
                 text, tip, ready = version_line()
+                if vlast.get("v") == (text, tip, ready):
+                    return
+                vlast["v"] = (text, tip, ready)
                 head, _, state = text.partition(" · ")
                 ok = "up to date" in state
                 ver_box.clear()
@@ -374,10 +389,10 @@ def build_shell() -> None:
         pt["filters"] = ui.row().classes("items-center gap-3 no-wrap")
         status = ui.row().classes("items-center gap-2 text-xs").style("color:var(--muted)")
 
-        def draw_status():
-            if getattr(client, "pt_hidden", False):
-                return                       # nobody is looking
-            color, text, tip = status_text()
+        refs: dict = {}
+
+        def build_status():
+            """Built once; the timer below only updates what changed (no redraw every few seconds)."""
             status.clear()
             with status:
                 if dev_mode():
@@ -385,21 +400,36 @@ def build_shell() -> None:
                     ui.badge("DEV" + (f" · {d['league']} · {d.get('phase') or 'auto'}" if d else ""),
                              color="deep-orange").props("outline").tooltip(
                         "Developer mode. League Start can be forced in Settings → Developer.")
-                icon, col = STATUS_ICON[color]
                 with ui.element("div").classes("pt-stat"):
-                    ui.icon(icon, size="18px").style(f"color:{col}")
+                    refs["icon"] = ui.icon("o_menu_book", size="18px")
                     with ui.tooltip().classes("text-body2"):
-                        ui.label(text).classes("text-weight-medium")
-                        if tip:
-                            ui.label(tip).style("max-width:280px;opacity:.85")
-                clip_on = bool(STATE.tracker and STATE.tracker.status().get("clipboard"))
+                        refs["text"] = ui.label("").classes("text-weight-medium")
+                        refs["tip"] = ui.label("").style("max-width:280px;opacity:.85")
                 with ui.element("div").classes("pt-stat"):
-                    ui.icon("o_content_paste", size="18px").style(
-                        f"color:{'var(--ex-gold, #c9a35a)' if clip_on else 'var(--ex-dim, #6f665a)'}")
-                    ui.tooltip("Map capture is on: Ctrl+C on a map in game saves it (Maps → Detailed Maps)."
-                               if clip_on else "Map capture is off (Settings → General).").classes("text-body2")
-                if STATE.updater:
-                    STATE.updater.check_soon()          # while the window is open, at most every 90 s
+                    refs["clip"] = ui.icon("o_content_paste", size="18px")
+                    refs["cliptip"] = ui.tooltip("").classes("text-body2")
+
+        def draw_status():
+            if getattr(client, "pt_hidden", False):
+                return                       # nobody is looking
+            if not refs:
+                build_status()
+            color, text, tip = status_text()
+            icon, col = STATUS_ICON[color]
+            clip_on = bool(STATE.tracker and STATE.tracker.status().get("clipboard"))
+            now = (icon, col, text, tip, clip_on)
+            if refs.get("last") != now:
+                refs["last"] = now
+                refs["icon"].set_name(icon)
+                refs["icon"].style(f"color:{col}")
+                refs["text"].set_text(text)
+                refs["tip"].set_text(tip or "")
+                refs["tip"].set_visibility(bool(tip))
+                refs["clip"].style(f"color:{'var(--ex-gold, #c9a35a)' if clip_on else 'var(--ex-dim, #6f665a)'}")
+                refs["cliptip"].set_text("Map capture is on: Ctrl+C on a map in game saves it (Maps → Detailed Maps)."
+                                         if clip_on else "Map capture is off (Settings → General).")
+            if STATE.updater:
+                STATE.updater.check_soon()          # while the window is open, at most every 90 s
 
         draw_status()
         ui.timer(5, draw_status)

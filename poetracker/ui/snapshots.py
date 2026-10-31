@@ -420,7 +420,7 @@ def _build(snap: dict) -> None:
         ui.label("Getting the passive tree from GGG's official export (once, a few MB)… reopen this in a moment.").classes("pt-note")
     elif snap.get("passives"):
         with ui.element("div").classes("pt-atlas pt-canvas pt-tree w-full q-mt-md").props(
-                f'data-scene="/scene/snap/{snap["id"]}" data-key="snap{snap["id"]}"'):
+                f'data-scene="/scene/snap/{snap["id"]}?v=3" data-key="snap{snap["id"]}"'):
             with ui.element("div").classes("pt-atlas-ctl"):
                 for icon, act in (("add", "in"), ("remove", "out"), ("fit_screen", "fit")):
                     ui.button(icon=icon).props(f'flat round dense size=sm data-atlas="{act}"')

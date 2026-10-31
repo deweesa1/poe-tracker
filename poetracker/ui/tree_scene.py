@@ -191,11 +191,12 @@ def passive(snap_id: int, passives: dict, base_class: str, ascendancy: str) -> d
         pts += [(asc_center[0] - asc_center[2], asc_center[1] - asc_center[2]),
                 (asc_center[0] + asc_center[2], asc_center[1] + asc_center[2])]
     start_vb = None
-    if len(pts) > 1:
-        ax0, ax1 = min(p[0] for p in pts), max(p[0] for p in pts)
-        ay0, ay1 = min(p[1] for p in pts), max(p[1] for p in pts)
-        w, h = max(ax1 - ax0, 3500) + 1200, max(ay1 - ay0, 2600) + 1200
-        start_vb = ((ax0 + ax1) / 2 - w / 2, (ay0 + ay1) / 2 - h / 2, w, h)
+    if len(pts) > 1:                  # centred on the middle of the tree, zoomed out just enough to show your points
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        hw = max(abs(p[0] - mx) for p in pts) + 700
+        hh = max(abs(p[1] - my) for p in pts) + 700
+        w, h = max(2 * hw, 4000), max(2 * hh, 3000)
+        start_vb = (mx - w / 2, my - h / 2, w, h)
     bg = None
     bgt = sc.sp.get("background", {}).get("c", {}).get("Background2")
     if bgt:

@@ -328,7 +328,7 @@ def mini_page():
             dev = dev_override() or {}
             data = STATE.cached(("mini", dev.get("league"), dev.get("phase")),
                                 lambda c: metrics.mini_status(c, STATE.cfg, dev.get("league"), dev.get("phase")),
-                                league=dev.get("league"))
+                                league=dev.get("league"), fresh=True)
             st = STATE.tracker.status() if STATE.tracker else {}
             from datetime import datetime, timezone
             age = None
