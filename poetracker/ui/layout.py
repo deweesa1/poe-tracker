@@ -322,8 +322,9 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
 })();
 </script>""")
 
-    with ui.header().classes("items-center q-px-lg q-py-sm gap-4"):
-        with ui.column().classes("gap-0 pt-head"):
+    with ui.header().classes("items-center no-wrap q-px-lg q-py-sm gap-4 pt-header"):
+        # title and page tabs on one line, so every page's top bar is the same height
+        with ui.row().classes("items-center no-wrap pt-head").style("gap:28px"):
             t = ui.label(title).classes("pt-title")
             if subtitle:
                 t.tooltip(subtitle)

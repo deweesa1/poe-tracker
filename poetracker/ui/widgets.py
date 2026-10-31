@@ -179,7 +179,18 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .q-tab--active { box-shadow: inset 0 2px 0 var(--lg, var(--ex-gold)); }
 .pt-zone-head { font-family: 'Cinzel', serif; letter-spacing: .04em; }
 /* page tabs in the top bar, under the title: words with a gold underline, no boxes */
-.pt-head-tabs { margin-top: 4px; }
+.pt-head-tabs { margin-top: 0; }
+.pt-head-tabs:empty { display: none; }
+.pt-header { min-height: 74px; }
+.pt-head-tabs .q-tab { min-height: 36px !important; }
+.pt-head { min-width: 0; }
+.pt-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1150px) {
+  .pt-title { font-size: 17px !important; }
+  .pt-head { gap: 16px !important; }
+  .pt-head-tabs .q-tab { margin-right: 10px; font-size: 11.5px; }
+  .pt-header .q-select { min-width: 150px !important; }
+}
 .pt-head-tabs .q-tabs { border-bottom: 0; min-height: 0; }
 .pt-head-tabs .q-tab { background: transparent !important; border: 0 !important; box-shadow: none !important;
   border-radius: 0; min-height: 28px; padding: 0 2px; margin-right: 18px; font-size: 12.5px; color: var(--ex-muted); }
