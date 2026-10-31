@@ -69,7 +69,7 @@ html {{ scroll-behavior: smooth; }}
   border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;
   background: var(--ex-gold, #c9a35a); color: #15120b; box-shadow: 0 0 0 3px var(--ex-bg, #14110f), 0 2px 8px rgba(0,0,0,.5); }}
 .pt-toggle:hover {{ background: var(--ex-gold-hi, #e6c27a); }}
-.pt-ver {{ align-self: stretch; margin: 6px 14px 0; padding: 10px 6px 8px; border-top: 1px solid var(--ex-line-dim, #2d2722); }}
+.pt-ver {{ align-self: stretch; margin: 6px 14px 0; padding: 12px 0 6px 5px; border-top: 1px solid var(--ex-line-dim, #2d2722); }}
 .pt-logo {{ padding-left: 16px; padding-right: 16px; }}
 body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
 .q-drawer--mini .q-mini-drawer-hide {{ display: none !important; }}
@@ -87,7 +87,7 @@ body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
 .q-drawer--mini .pt-nav .q-item__section--avatar {{ min-width: 0 !important; padding: 0 !important; justify-content: center; }}
 .q-drawer--mini .pt-nav .q-icon {{ font-size: 19px !important; }}
 .q-drawer--mini .pt-sep {{ width: 24px; margin: 6px auto; align-self: center; }}
-.q-drawer--mini .pt-ver {{ margin: 6px auto 0; padding: 10px 0 8px; width: 24px; display: flex; justify-content: center; }}
+.q-drawer--mini .pt-ver {{ margin: 6px auto 0; padding: 14px 0 6px; width: 24px; display: flex; justify-content: center; }}
 .q-drawer--mini .pt-ver > .nicegui-row {{ width: auto !important; justify-content: center; }}
 
 
@@ -131,6 +131,17 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-nav .q-item:hover { color: var(--ex-gold-hi); background: var(--ex-a06); }
 .pt-nav .q-item.active { color: var(--ex-gold-hi); border-left-color: var(--ex-gold);
   background: linear-gradient(90deg, var(--ex-a20), transparent 85%); }
+/* menu rows: the icon sits in a 40px square (the same squares as the collapsed menu); the
+   page you're on gets the fading gold highlight and a bar on the menu's left edge */
+.pt-nav .q-item { border-left: 0 !important; border-radius: 8px !important; min-height: 40px !important; height: 40px;
+  margin: 3px 8px !important; padding: 0 10px 0 0 !important; position: relative; overflow: visible !important; }
+.pt-nav .q-item__section--avatar { min-width: 40px !important; width: 40px; padding: 0 !important;
+  justify-content: center; align-items: center; }
+.pt-nav .q-item .q-icon { font-size: 19px !important; }
+.pt-nav .q-item.active::before { content: ""; position: absolute; left: -8px; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 2px 2px 0; background: var(--ex-gold); }
+.pt-logo { padding-left: 15px !important; }
+.pt-logo img { width: 26px !important; height: 26px !important; }
 .pt-card, .pt-kpi { background: linear-gradient(180deg, var(--ex-panel) 0%, var(--ex-panel-2) 100%);
   border: 1px solid var(--ex-line); border-radius: 3px;
   box-shadow: inset 0 0 0 1px #000, inset 0 0 0 2px var(--ex-a10), 0 3px 14px rgba(0,0,0,.55); }
@@ -161,7 +172,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-ls-name { font-family: 'Cinzel', serif; letter-spacing: .03em; color: var(--lg-hi, var(--ex-gold-hi));
   text-shadow: 0 0 18px var(--lg-a28, transparent); }
 .q-header { border-bottom: 2px solid var(--lg, var(--ex-line)) !important; }
-.pt-nav .q-item.active { border-left-color: var(--lg, var(--ex-gold)) !important; }
+
 .q-tab--active { box-shadow: inset 0 2px 0 var(--lg, var(--ex-gold)); }
 .pt-zone-head { font-family: 'Cinzel', serif; letter-spacing: .04em; }
 ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--ex-bg-2); }
