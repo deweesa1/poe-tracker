@@ -33,9 +33,8 @@ SHEETS = ("normalActive", "normalInactive", "notableActive", "notableInactive", 
           "keystoneInactive", "wormholeActive", "wormholeInactive", "mastery", "groupBackground",
           "startNode", "frame", "atlasBackground")
 REFRESH_S = 3 * 86400                 # look for a new tree every few days
-CREDIT = ("Atlas tree data and art © Grinding Gear Games, from their official atlastree-export. "
-          "Node ids linked with RePoE. PoE Tracker is a fan-made tool and isn't affiliated with "
-          "or endorsed by Grinding Gear Games.")
+CREDIT = ("Atlas tree data and art © Grinding Gear Games, from their official atlastree-export; node ids linked "
+          "with RePoE. PoE Tracker is unofficial and not affiliated with or endorsed by Grinding Gear Games.")
 
 # angles (degrees, clockwise from 12 o'clock) for orbits that aren't evenly spaced
 ORBIT_ANGLES = {

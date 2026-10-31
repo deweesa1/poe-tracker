@@ -339,7 +339,10 @@ def build_shell() -> None:
                             if state:
                                 ui.label(state.capitalize()).style("font-size:10.5px;color:var(--ex-muted, #a69b8c);"
                                                                    "line-height:1.25")
-                        ui.tooltip(f"{text} · {tip}" if tip else text).classes("text-body2")
+                        with ui.tooltip().classes("text-body2"):
+                            ui.label(f"{text} · {tip}" if tip else text)
+                            ui.label("Unofficial fan-made tool, not affiliated with Grinding Gear Games.").style(
+                                "opacity:.75;font-size:12px")
             draw_version()
             ui.timer(10, draw_version)
         # round button on the menu's edge, level with Settings: collapse to icons / expand

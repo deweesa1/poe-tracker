@@ -1905,9 +1905,11 @@ document.addEventListener('keydown', onKey, true);
                         note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
                              "shows. The pages keep working out their own numbers, so a finished league still shows where its "
                              "league start ended. Set League back to Automatic to stop forcing.")
-        with _section("About", "o_info"):
-            ui.label("PoE Tracker is a free, fan-made tool. It isn't affiliated with or endorsed by Grinding Gear Games.")
-            note("Path of Exile and its art are © Grinding Gear Games. The Atlas tree is drawn from GGG's official "
+        from .. import legal
+        with card("Disclaimer"):
+            ui.label(legal.DISCLAIMER).classes("text-weight-medium")
+            ui.label(legal.TRADEMARKS)
+            note("The Atlas tree is drawn from GGG's official "
                  "atlastree-export (downloaded the first time you open it, not shipped with the app); its node ids are "
                  "linked with RePoE, a community export of the game data. Everything the tracker records stays on this PC.")
 

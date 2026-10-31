@@ -34,6 +34,7 @@ UninstallDisplayName={#AppName}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+InfoBeforeFile=..\DISCLAIMER.txt
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 ; close a running tracker so its files can be replaced

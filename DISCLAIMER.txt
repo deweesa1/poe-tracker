@@ -1,0 +1,11 @@
+PoE Tracker - Disclaimer
+
+PoE Tracker is an unofficial, fan-made tool. It is not affiliated with,
+endorsed by, or sponsored by Grinding Gear Games in any way.
+
+Path of Exile and all related names, artwork and game data are trademarks
+or copyrights of Grinding Gear Games.
+
+PoE Tracker only reads the game's log file (Client.txt) and, if you turn it
+on, your clipboard and your public pathofexile.com profile. It never changes
+the game or its files, and everything it records stays on your PC.

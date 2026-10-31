@@ -1,5 +1,7 @@
 # PoE Tracker
 
+> **Disclaimer:** PoE Tracker is an unofficial, fan-made tool. It is not affiliated with, endorsed by, or sponsored by Grinding Gear Games in any way. Path of Exile and all related names, artwork and game data are trademarks or copyrights of Grinding Gear Games.
+
 A personal Path of Exile tracker that runs on your PC. It reads the game's `Client.txt` log while you play and shows a dashboard in your browser: play time, maps, tiers, mechanics, campaign act times, levels, deaths, passive and atlas tree changes, trade whispers, copied maps, and currency snapshots that you enter yourself.
 
 It never touches the game. It only reads the log file and, if you turn it on, the clipboard.
@@ -90,8 +92,7 @@ Code map:
 
 ## Credits
 
-PoE Tracker is a free, fan-made tool and isn't affiliated with or endorsed by Grinding Gear Games.
-Path of Exile and its art are © Grinding Gear Games. The Atlas Tree page draws the tree from GGG's official
+See the disclaimer at the top (also in `DISCLAIMER.txt`). The Atlas Tree page draws the tree from GGG's official
 [atlastree-export](https://github.com/grindinggear/atlastree-export), downloaded on first use into the data folder
 (nothing of it is shipped with the app); passive names come from GGG's
 [skilltree-export](https://github.com/grindinggear/skilltree-export) the same way. Atlas node ids are linked with [RePoE](https://github.com/repoe-fork/repoe).
