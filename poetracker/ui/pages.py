@@ -1148,16 +1148,22 @@ def character_page():
             return empty("No characters in this league yet.")
         d = data(cid)
         ch = d["character"]
-        ui.label(f"{ch['name']} · {ch['class'] or ''} · level {ch['level'] or '?'} · first seen {fmt.date(ch['first_seen'])}").classes("pt-h2 q-mt-sm")
-        cp = d["campaign"]
-        kpis([
-            ("Level", str(ch["level"] or "–")),
-            ("Played", fmt.hours(d["total_active_s"])),
-            ("Campaign", fmt.dur(cp["active_s"], True) if cp else "–",
-             ("completed" if cp["completed"] else "in progress") if cp else "not in log"),
-            ("Deaths", fmt.num(d["death_count"])),
-            ("Passive changes", fmt.num(d["tree"]["change_count"]), f"{d['tree']['count']} points known now"),
-        ])
+        info = next((c for c in chars if c["id"] == cid), {})
+        hrs = (d["total_active_s"] or 0) / 3600
+        maps = info.get("maps") or 0
+        tiles = [("Level", str(ch["level"] or "–"), ""),
+                 ("Played", fmt.hours(d["total_active_s"]), ""),
+                 ("Maps", fmt.num(maps), f"{maps / hrs:.1f} per hour" if hrs >= 1 and maps else ""),
+                 ("Deaths", fmt.num(d["death_count"]), f"{d['death_count'] / hrs:.1f} per hour" if hrs >= 1 else "")]
+        esc_ = __import__("html").escape
+        ui.html(
+            '<div class="pt-card pt-charhead"><div class="who">'
+            f'<div class="nm">{esc_(ch["name"])}</div>'
+            f'<div class="cl">{esc_(ch["class"] or "")}{" · " + esc_(ch.get("league") or "") if ch.get("league") else ""}</div>'
+            f'<div class="dt">First seen {fmt.date(ch["first_seen"])} · last played {fmt.when(ch["last_seen"])}</div></div>'
+            '<div class="tiles">' + "".join(
+                f'<div><small>{k}</small><b>{esc_(v)}</b>' + (f'<i>{esc_(sub)}</i>' if sub else "") + "</div>"
+                for k, v, sub in tiles) + "</div></div>").classes("w-full")
 
     @ui.refreshable
     def detail():

@@ -261,6 +261,16 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-snapdiff b { color: var(--ex-gold-hi); font-weight: 600; }
 .pt-snaplist { font-size: 13px; line-height: 1.45; color: var(--ex-text); }
 .pt-snaplist .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-right: 6px; }
+/* Characters: the selected character's header */
+.pt-charhead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 32px; padding: 18px 24px; }
+.pt-charhead .nm { font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; letter-spacing: .03em; color: var(--ex-gold-hi); line-height: 1.15; }
+.pt-charhead .cl { font-size: 15px; color: var(--ex-text); margin-top: 2px; }
+.pt-charhead .dt { font-size: 12.5px; color: var(--ex-muted); margin-top: 2px; }
+.pt-charhead .tiles { display: flex; gap: 28px; flex-wrap: wrap; }
+.pt-charhead .tiles div { display: flex; flex-direction: column; min-width: 70px; }
+.pt-charhead .tiles small { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ex-muted); }
+.pt-charhead .tiles b { font-size: 26px; font-weight: 700; color: var(--ex-text); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pt-charhead .tiles i { font-style: normal; font-size: 12px; color: var(--ex-muted); }
 /* snapshot: the inventory as the game draws it, jewels, skills */
 .pt-snaphead { font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--ex-gold-hi); }
 .pt-paperdoll { position: relative; flex: none; padding: 34px 18px 18px; border-radius: 4px;
@@ -317,10 +327,10 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-skill .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-skill .ln { font-size: 10.5px; font-weight: 700; color: #14110f; background: #c9a35a; border-radius: 2px; padding: 0 5px; }
 .pt-skill .wh { font-size: 13px; color: #6fd3c6; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pt-skill .chain { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 12px; column-gap: 2px; }
-.pt-skill .chain > i.lk { width: 12px; height: 4px; margin-top: 21px; flex: none; border-radius: 2px;
+.pt-skill .chain { display: flex; align-items: flex-start; flex-wrap: nowrap; column-gap: 2px; }
+.pt-skill .chain > i.lk { width: 9px; height: 4px; margin-top: 21px; flex: none; border-radius: 2px;
   background: linear-gradient(180deg, #3e2f1c, #9a7c4c 50%, #5a4426); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
-.pt-skill .gs { display: flex; flex-direction: column; align-items: center; width: 82px; cursor: help; }
+.pt-skill .gs { display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 62px; max-width: 92px; cursor: help; }
 .pt-skill .gs b { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   box-sizing: border-box; border: 2px solid color-mix(in srgb, var(--sc) 85%, #000);
   background:
@@ -335,6 +345,12 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-skill .gs small { font-size: 11px; line-height: 1.15; text-align: center; margin-top: 3px; color: #6fd3c6; font-weight: 600; }
 .pt-skill .gs.sup small { color: #8fa8c8; font-weight: 400; }
 .pt-skill .gs.empty small { color: var(--ex-dim, #6f665a); }
+.pt-skill .gs small { overflow-wrap: normal; word-break: normal; font-size: 10.5px; }
+.pt-skill .chain > i.lk.ext { background: repeating-linear-gradient(90deg, #9a7c4c 0 3px, transparent 3px 6px); box-shadow: none; }
+.pt-skill .gs.granted b { border-style: dashed; border-color: #8a7046; }
+.pt-skill .gs.granted .gi { color: #c9a35a; font-size: 18px; line-height: 1; }
+.pt-skill .gs.granted small { color: #c9a35a; }
+.pt-tree-credit { position: absolute; left: 10px; bottom: 8px; z-index: 2; font-size: 11px; color: rgba(200,190,170,.55); pointer-events: none; }
 .pt-atlas.pt-tree { height: max(560px, calc(100vh - 240px)); }
 /* atlas passive tree */
 .pt-atlas { contain: strict; position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);

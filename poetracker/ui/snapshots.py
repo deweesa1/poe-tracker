@@ -17,6 +17,8 @@ SLOTS = [("Weapon", "Weapon"), ("Offhand", "Off hand"), ("Helm", "Helmet"), ("Bo
          ("Gloves", "Gloves"), ("Boots", "Boots"), ("Amulet", "Amulet"), ("Ring", "Ring"), ("Ring2", "Ring"),
          ("Belt", "Belt"), ("Weapon2", "Swap weapon"), ("Offhand2", "Swap off hand")]
 esc = html.escape
+WORN = {"Weapon", "Offhand", "Weapon2", "Offhand2", "Helm", "BodyArmour", "Gloves", "Boots", "Amulet", "Ring", "Ring2",
+        "Belt", "Flask", "Trinket"}       # equipped slots (the profile also lists the main inventory)
 
 
 def _item_name(it: dict) -> str:
@@ -315,9 +317,9 @@ def _show(snap: dict | None, prev: dict | None) -> None:
     if not snap or not snap.get("items"):
         empty("This snapshot has no data.")
         return
-    items = snap["items"].get("items") or []
+    items = [i for i in snap["items"].get("items") or [] if i.get("inventoryId") in WORN]
     by = {_item_key(i): i for i in items}
-    pv = {_item_key(i): i for i in (prev or {}).get("items", {}).get("items") or []} if prev and prev.get("items") else {}
+    pv = {_item_key(i): i for i in (prev or {}).get("items", {}).get("items") or [] if i.get("inventoryId") in WORN} if prev and prev.get("items") else {}
     ps, pp = _passive_summary(snap.get("passives")), _passive_summary((prev or {}).get("passives")) if prev else None
 
     # ---- what changed
@@ -357,9 +359,10 @@ def _show(snap: dict | None, prev: dict | None) -> None:
             rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower()) for k, v in rv.items()]
             row = (lambda cs: f'<div class="pt-def" style="grid-template-columns:repeat({len(cs)}, 1fr)">' + "".join(
                 f'<span class="{c}"><small>{esc(k)}</small>{esc(v)}</span>' for k, v, c in cs) + "</div>")
-            ui.html(row(dcells) + row(rcells) +
-                    '<div class="pt-note" style="font-size:11px">From your gear only: each item\'s own defences and '
-                    'resistance mods, before the passive tree, the act penalty and other bonuses.</div>')
+            ui.label("Gear Determined Stats").classes("pt-snaphead").tooltip(
+                "Added up from what you're wearing: each item's own defences and resistance mods, before the "
+                "passive tree, the act penalty and other bonuses.")
+            ui.html(row(dcells) + row(rcells))
             if jewels or abyss:
                 ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
                 ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
@@ -369,18 +372,15 @@ def _show(snap: dict | None, prev: dict | None) -> None:
 
     # ---- the passive tree, with the ascendancy over it like in game
     asc = (snap["items"].get("character") or {}).get("class") or snap.get("class") or ""
-    head = f"Passive tree · {ps['points']} points" + (f" · {ps['asc']} ascendancy ({asc})" if ps["asc"] else "")
-    ui.label(head).classes("pt-snaphead q-mt-md")
     if not passive_tree.status()["ready"]:
         ui.label("Getting the passive tree from GGG's official export (once, a few MB)… reopen this in a moment.").classes("pt-note")
     elif snap.get("passives"):
-        with ui.element("div").classes("pt-atlas pt-canvas pt-tree w-full").props(
+        with ui.element("div").classes("pt-atlas pt-canvas pt-tree w-full q-mt-md").props(
                 f'data-scene="/scene/snap/{snap["id"]}" data-key="snap{snap["id"]}"'):
             with ui.element("div").classes("pt-atlas-ctl"):
                 for icon, act in (("add", "in"), ("remove", "out"), ("fit_screen", "fit")):
                     ui.button(icon=icon).props(f'flat round dense size=sm data-atlas="{act}"')
-        note("Scroll to zoom, drag to move, hover a point, gem or item for what it does. "
-             "Tree and item art © Grinding Gear Games.")
+            ui.html('<div class="pt-tree-credit">Art © Grinding Gear Games</div>')
 
 
 
@@ -504,6 +504,7 @@ def _skills(items: list[dict]) -> str:
         if not socks:                        # no socket info: one group
             groups = {0: sorted(gems)}
         label = dict(SLOTS).get(it.get("inventoryId"), it.get("inventoryId") or "")
+        granted = _item_supports(it)
         for grp in sorted(groups):
             idxs = groups[grp]
             gl = [gems[i] for i in idxs if i in gems]
@@ -529,6 +530,11 @@ def _skills(items: list[dict]) -> str:
                           f'<b>{img}</b>'
                           f'<em>{esc(lvl or "?")}{("/" + esc(qual) + "%") if qual else ""}</em>'
                           f'<small>{esc(short)}</small></span>')
+            for lvl_, nm in granted:          # supports the item itself gives every gem in it
+                chain += ('<i class="lk ext"></i>'
+                          f'<span class="gs sup granted pt-tipable" data-n="{esc(nm)}" data-c="#c9a35a" '
+                          f'data-s="{esc("Supports every gem socketed in this item")}" data-a="From the item\'s mods">'
+                          f'<b><span class="gi">✦</span></b><em>{esc(lvl_)}</em><small>{esc(nm.replace(" Support", ""))}</small></span>')
             linked = len(idxs)
             what = (", ".join(g.get("typeLine") or "?" for g in actives) or "Supports only")
             cards += (f'<div class="pt-skill"><div class="hd">'
@@ -536,6 +542,19 @@ def _skills(items: list[dict]) -> str:
                       + f'<span class="sl">{esc(label)}</span><span class="ln">{linked}-Link</span>'
                       f'<span class="wh">{esc(what)}</span></div><div class="chain">{chain}</div></div>')
     return cards
+
+
+def _item_supports(it: dict) -> list[tuple[str, str]]:
+    """Supports an item gives its socketed gems: "Socketed Gems are Supported by Level 20 Added Fire Damage"."""
+    import re
+    out = []
+    pat = re.compile(r"Socketed (?:Gems|Skill Gems|Spells|Attacks|\w+ Gems) are Supported by Level (\d+) (.+)", re.I)
+    for key in ("implicitMods", "explicitMods", "craftedMods", "fracturedMods", "enchantMods", "mutatedMods"):
+        for m in it.get(key) or []:
+            x = pat.search(_mod_text(m))
+            if x:
+                out.append((x.group(1), x.group(2).strip()))
+    return out
 
 
 def _jewel_row(j: dict) -> str:
