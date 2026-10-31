@@ -234,25 +234,44 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
     ui.dark_mode(True)
     ui.colors(primary=primary, secondary="#4fb3a5", accent="#a68bd6", dark="#1d1916", dark_page="#14110f")
 
-    with ui.left_drawer(value=True, fixed=True).props("width=252 bordered breakpoint=700").classes(
-            "q-pa-none column no-wrap"):
-        with ui.row().classes("items-center gap-3 q-px-md q-pt-lg q-pb-md no-wrap"):
+    mini = bool(STATE.pref("drawer_mini", False))
+    drawer = ui.left_drawer(value=True, fixed=True).props(
+        f"width=252 mini-width=64 bordered breakpoint=700{' mini' if mini else ''}").classes("q-pa-none column no-wrap")
+    ui.query("body").classes(add="pt-mini" if mini else "", remove="" if mini else "pt-mini")
+
+    def toggle_mini():
+        now = not bool(STATE.pref("drawer_mini", False))
+        STATE.set_pref("drawer_mini", now)
+        drawer.props(add="mini") if now else drawer.props(remove="mini")
+        ui.run_javascript(f"document.body.classList.toggle('pt-mini', {str(now).lower()})")
+        toggle_icon.set_name("keyboard_double_arrow_right" if now else "keyboard_double_arrow_left")
+
+    def nav_item(label, icon, on_click, active=False, trailing=None, tip=None):
+        with ui.item(on_click=on_click).classes("active" if active else ""):
+            with ui.item_section().props("avatar").style("min-width:34px"):
+                ui.icon(icon, size="20px")
+            ui.item_section(label).classes("q-mini-drawer-hide").style("white-space:nowrap")
+            if trailing:
+                with ui.item_section().props("side").classes("q-mini-drawer-hide"):
+                    ui.icon(trailing, size="15px").style("color:var(--ex-dim, #6f665a)")
+            # names show on hover only while the menu is collapsed to icons
+            ui.tooltip(tip or label).props('anchor="center right" self="center left" :offset="[10, 0]"').classes(
+                "pt-nav-tip text-body2")
+
+    with drawer:
+        with ui.row().classes("items-center gap-3 q-pt-lg q-pb-md no-wrap pt-logo"):
             ui.html('<img src="/static/icon.svg" alt="" style="width:30px;height:30px;display:block;'
                     'filter:drop-shadow(0 0 6px rgba(217,164,65,.35))">')
-            ui.label("PoE Tracker").classes("text-weight-bold")
+            ui.label("PoE Tracker").classes("text-weight-bold q-mini-drawer-hide")
         ls = league_start()
         with ui.list().classes("pt-nav w-full"):
             for href, label, icon in NAV:
-                if not is_open(href):
-                    continue
-                with ui.item(on_click=lambda h=href: ui.navigate.to(h)).classes("active" if href == path else ""):
-                    with ui.item_section().props("avatar").style("min-width:34px"):
-                        ui.icon(icon, size="20px")
-                    ui.item_section(label).style("white-space:nowrap")
+                if is_open(href):
+                    nav_item(label, icon, lambda h=href: ui.navigate.to(h), active=href == path)
         if ls["phase"] in PHASE_PAGE:
             prog = ("Campaign phase" if ls["phase"] == "campaign" else
                     f"Mapping · {ls['voidstones']}/{ls['voidstones_total']} Voidstones")
-            with ui.column().classes("q-px-md q-pt-lg gap-0 w-full"):
+            with ui.column().classes("q-px-md q-pt-lg gap-0 w-full q-mini-drawer-hide"):
                 ui.label("League start").classes("pt-ls-head")
                 ui.label(prog).style("font-size:12.5px;color:var(--ex-gold-hi, #e6c27a);margin-bottom:4px")
                 for k, v in (("Campaign", ls.get("campaign_name")), ("Mapping", ls.get("mapping_name"))):
@@ -262,41 +281,42 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                             ui.label(v).style("font-size:12.5px;color:var(--ex-text, #ece4d8);overflow:hidden;"
                                               "text-overflow:ellipsis;white-space:nowrap")
         ui.space()
-        with ui.column().classes("w-full gap-0 q-pt-sm").style("border-top:1px solid var(--ex-line-dim, #2d2722)"):
+        with ui.column().classes("w-full gap-0 q-pt-sm pt-drawer-foot"):
             with ui.list().classes("pt-nav w-full"):
-                with ui.item(on_click=open_mini).tooltip("A small always-on-top window with your live timer"):
-                    with ui.item_section().props("avatar").style("min-width:34px"):
-                        ui.icon("picture_in_picture_alt", size="20px")
-                    ui.item_section("Mini Tracker").style("white-space:nowrap")
-                    with ui.item_section().props("side"):
-                        ui.icon("open_in_new", size="15px").style("color:var(--ex-dim, #6f665a)")
+                nav_item("Mini Tracker", "picture_in_picture_alt", open_mini, trailing="open_in_new",
+                         tip="Mini Tracker (opens a window)")
                 href, label, icon = SETTINGS
-                with ui.item(on_click=lambda: ui.navigate.to(href)).classes("active" if href == path else ""):
-                    with ui.item_section().props("avatar").style("min-width:34px"):
-                        ui.icon(icon, size="20px")
-                    ui.item_section(label).style("white-space:nowrap")
+                nav_item(label, icon, lambda: ui.navigate.to(href), active=href == path)
             ver_box = ui.element("div").classes("pt-ver")
 
             def draw_version():
                 text, tip, ready = version_line()
+                head, _, state = text.partition(" · ")
+                ok = "up to date" in state
                 ver_box.clear()
                 with ver_box:
                     if ready:
-                        ui.button(text, icon="system_update", on_click=update_dialog).props(
-                            "dense unelevated no-caps size=sm color=primary text-color=dark").classes("w-full").tooltip(tip)
+                        with ui.row().classes("items-center no-wrap gap-2 w-full cursor-pointer").on("click", update_dialog):
+                            ui.icon("system_update", size="18px").style("color:var(--ex-gold-hi, #e6c27a)")
+                            ui.label(text).classes("q-mini-drawer-hide").style(
+                                "font-size:12px;font-weight:600;color:var(--ex-gold-hi, #e6c27a)")
+                            ui.tooltip(f"{text} · click to update. {tip}").classes("text-body2")
                         return
-                    head, _, state = text.partition(" · ")
-                    ok = "up to date" in state
-                    with ui.row().classes("items-center no-wrap gap-2 w-full").tooltip(tip):
-                        ui.icon("o_verified" if ok else "o_info", size="16px").style(
+                    with ui.row().classes("items-center no-wrap gap-2 w-full"):
+                        ui.icon("o_verified" if ok else "o_info", size="18px").style(
                             f"color:{'var(--ex-gold, #c9a35a)' if ok else 'var(--ex-muted, #a69b8c)'}")
-                        with ui.column().classes("gap-0"):
+                        with ui.column().classes("gap-0 q-mini-drawer-hide"):
                             ui.label(head).style("font-size:11.5px;color:var(--ex-text, #ece4d8);line-height:1.25")
                             if state:
                                 ui.label(state.capitalize()).style("font-size:10.5px;color:var(--ex-muted, #a69b8c);"
                                                                    "line-height:1.25")
+                        ui.tooltip(f"{text} · {tip}" if tip else text).classes("text-body2")
             draw_version()
             ui.timer(10, draw_version)
+            with ui.row().classes("w-full q-px-md q-pb-sm pt-collapse-row"):
+                toggle_icon = ui.icon("keyboard_double_arrow_right" if mini else "keyboard_double_arrow_left",
+                                      size="20px").classes("pt-collapse cursor-pointer").on("click", toggle_mini)
+                toggle_icon.tooltip("Collapse / expand the menu")
 
     with ui.header().classes("items-center q-px-lg q-py-sm gap-4"):
         with ui.column().classes("gap-0"):

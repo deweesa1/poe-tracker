@@ -62,8 +62,19 @@ html {{ scroll-behavior: smooth; }}
 }}
 .pt-ls-head {{ font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
   color: var(--ex-gold, #d9a441); margin-bottom: 2px; }}
-.pt-ver {{ align-self: stretch; margin: 10px 14px 14px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--ex-line-dim, #2d2722);
-  background: rgba(0,0,0,.18); }}
+.pt-drawer-foot {{ border-top: 1px solid var(--ex-line-dim, #2d2722); }}
+.pt-ver {{ align-self: stretch; margin: 6px 14px 0; padding: 10px 6px 8px; border-top: 1px solid var(--ex-line-dim, #2d2722); }}
+.pt-logo {{ padding-left: 16px; padding-right: 16px; }}
+.pt-collapse {{ color: var(--ex-dim, #6f665a); padding: 4px; border-radius: 4px; }}
+.pt-collapse:hover {{ color: var(--ex-gold-hi, #e6c27a); background: rgba(255,255,255,.04); }}
+body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
+.q-drawer--mini .q-mini-drawer-hide {{ display: none !important; }}
+.q-drawer--mini .pt-logo {{ padding: 24px 0 16px !important; justify-content: center; width: 100%; }}
+.q-drawer--mini .pt-nav .q-item {{ justify-content: center; padding-left: 0 !important; padding-right: 0 !important; margin: 1px 8px; }}
+.q-drawer--mini .pt-nav .q-item__section--avatar {{ min-width: 0 !important; padding-right: 0 !important; }}
+.q-drawer--mini .pt-ver {{ margin: 6px 10px 0; padding: 10px 0 8px; display: flex; justify-content: center; }}
+.q-drawer--mini .pt-ver > .nicegui-row {{ width: auto !important; justify-content: center; }}
+.q-drawer--mini .pt-collapse-row {{ justify-content: center; padding-left: 0 !important; padding-right: 0 !important; }}
 .pt-stat {{ display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
   border-radius: 50%; border: 1px solid var(--ex-line-dim, #2d2722); background: rgba(0,0,0,.18); cursor: default; }}
 .pt-actbar a:hover > div {{ filter: brightness(1.15); box-shadow: 0 0 0 1px #ece4d8 inset; }}
