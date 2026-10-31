@@ -1612,8 +1612,6 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
         rows = [x for x in m["milestones"] if x["group"] == s_["name"]]
         got = next((x for x in rows if x.get("voidstone")), {})
         stones.append({"name": s_["name"].replace(" Voidstone", ""), "done": s_["obtained"], "t": clock(got),
-                       "extra": (f"More Crucibles ran ×{m.get('crucibles_ran')}"
-                                 if s_["name"].startswith("Ceremonial") and m.get("crucibles_ran") else None),
                        "steps": [{"name": x["name"] + (f" ×{x['kills']}" if (x.get("kills") or 0) > 1
                                                        and not x["name"].startswith("Maven's Crucible") else ""),
                                   "done": x["done"], "t": clock(x), "likely": x.get("likely")}
