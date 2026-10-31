@@ -49,6 +49,8 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     app.on_shutdown(tracker.stop.set)
 
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))
+    from .. import atlas_tree
+    app.add_static_files("/atlastree", str(atlas_tree.cache_dir()))     # GGG's tree art, downloaded on first use
     from . import pages  # noqa: F401  (registers the pages)
     from . import mini_page  # noqa: F401  (the mini window's page)
     from . import layout

@@ -81,4 +81,11 @@ Code map:
 - **Time:** "played" means time in areas minus AFK periods. Time inside a map counts every portal entry and side area of that map instance; hideout time between portals doesn't count.
 - **Leagues:** a character belongs to the league that was running when it first appeared. Start dates are in `config\leagues.yaml`. Add each new league there when it launches, or pin a character to a league.
 - **Passive and atlas trees:** only points changed while the log was recording are known.
-- **Not possible from the log:** stash contents, gear, gems and links, and the full tree. Those would need GGG's API, which isn't open to new apps.
+- **Not possible from the log:** stash contents, gear, gems and links. Those would need GGG's API, which isn't open to new apps.
+
+## Credits
+
+PoE Tracker is a free, fan-made tool and isn't affiliated with or endorsed by Grinding Gear Games.
+Path of Exile and its art are © Grinding Gear Games. The Atlas Tree page draws the tree from GGG's official
+[atlastree-export](https://github.com/grindinggear/atlastree-export), downloaded on first use into the data folder
+(nothing of it is shipped with the app). Atlas node ids are linked with [RePoE](https://github.com/repoe-fork/repoe).

@@ -389,6 +389,68 @@ document.addEventListener("click", (e) => {
     emitEvent("map_toggle", [m.dataset.name, on]);
   }
 });
+// ---- atlas tree: scroll to zoom, drag to move, hover card (the view survives page refreshes)
+(() => {
+  let saved = null, drag = null;
+  const svgOf = (el) => el && el.closest(".pt-atlas")?.querySelector("svg.pt-atlas-svg");
+  const getVB = (svg) => svg.getAttribute("viewBox").split(" ").map(Number);
+  const setVB = (svg, v) => { svg.setAttribute("viewBox", v.map(n => n.toFixed(1)).join(" ")); saved = v; };
+  const zoom = (svg, f, cx, cy) => {
+    const v = getVB(svg), full = svg.dataset.vb.split(" ").map(Number);
+    let w = Math.min(Math.max(v[2] * f, full[2] / 40), full[2] * 1.2), k = w / v[2], h = v[3] * k;
+    setVB(svg, [cx - (cx - v[0]) * k, cy - (cy - v[1]) * k, w, h]);
+  };
+  const toTree = (svg, e) => {
+    const r = svg.getBoundingClientRect(), v = getVB(svg), s = Math.max(v[2] / r.width, v[3] / r.height);
+    const ox = v[0] + v[2] / 2 - r.width * s / 2, oy = v[1] + v[3] / 2 - r.height * s / 2;
+    return [ox + (e.clientX - r.left) * s, oy + (e.clientY - r.top) * s, s];
+  };
+  document.addEventListener("wheel", (e) => {
+    const svg = svgOf(e.target); if (!svg) return;
+    e.preventDefault();
+    const [x, y] = toTree(svg, e);
+    zoom(svg, e.deltaY > 0 ? 1.18 : 1 / 1.18, x, y);
+  }, {passive: false});
+  document.addEventListener("pointerdown", (e) => {
+    const svg = svgOf(e.target); if (!svg || e.button !== 0 || e.target.closest(".pt-atlas-ctl")) return;
+    drag = {svg, x: e.clientX, y: e.clientY, v: getVB(svg), s: toTree(svg, e)[2]};
+    svg.classList.add("grab");
+  });
+  document.addEventListener("pointermove", (e) => {
+    const tip = document.getElementById("pt-atlas-tip");
+    if (drag) {
+      const v = drag.v;
+      setVB(drag.svg, [v[0] - (e.clientX - drag.x) * drag.s, v[1] - (e.clientY - drag.y) * drag.s, v[2], v[3]]);
+      if (tip) tip.style.display = "none";
+      return;
+    }
+    const g = e.target.closest && e.target.closest(".pt-atlas g.nd");
+    if (!g) { if (tip) tip.style.display = "none"; return; }
+    let t = tip;
+    if (!t) { t = document.createElement("div"); t.id = "pt-atlas-tip"; document.body.appendChild(t); }
+    const esc = (x) => (x || "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+    t.innerHTML = `<b>${esc(g.dataset.n)}</b>` +
+      (g.dataset.s ? g.dataset.s.split("\\n").map(x => `<div>${esc(x)}</div>`).join("") : "") +
+      (g.dataset.a ? `<i>${esc(g.dataset.a)}</i>` : "");
+    t.style.display = "block";
+    const W = window.innerWidth, H = window.innerHeight, r = t.getBoundingClientRect();
+    t.style.left = Math.min(e.clientX + 16, W - r.width - 8) + "px";
+    t.style.top = Math.min(e.clientY + 16, H - r.height - 8) + "px";
+  });
+  document.addEventListener("pointerup", () => { if (drag) drag.svg.classList.remove("grab"); drag = null; });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-atlas]"); const svg = svgOf(b); if (!b || !svg) return;
+    const v = getVB(svg);
+    if (b.dataset.atlas === "fit") setVB(svg, svg.dataset.vb.split(" ").map(Number));
+    else zoom(svg, b.dataset.atlas === "in" ? 1 / 1.4 : 1.4, v[0] + v[2] / 2, v[1] + v[3] / 2);
+  });
+  new MutationObserver(() => {
+    const svg = document.querySelector("svg.pt-atlas-svg:not([data-seen])");
+    if (!svg) return;
+    svg.setAttribute("data-seen", "1");
+    if (saved && location.pathname === "/atlas") setVB(svg, saved);
+  }).observe(document.body, {childList: true, subtree: true});
+})();
 </script>""")
 
 

@@ -1213,6 +1213,7 @@ def atlas_page():
             ("Changes logged", fmt.num(t["change_count"])),
             ("Tree versions mapped with", fmt.num(len([v for v in d["versions"] if v["atlas_hash"] != "-"]))),
         ])
+        _atlas_tree_card(t)
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Points by mechanic", "flex-1"):
                 table([{"name": "group", "label": "Group", "fmt": lambda v, r: (v or "").capitalize()},
@@ -1240,6 +1241,47 @@ def atlas_page():
     with body:
         content()
     auto_refresh(content.refresh)
+
+
+def _atlas_tree_card(t: dict) -> None:
+    from .. import atlas_tree
+    from . import atlas_view
+    atlas_tree.ensure()
+    lay = atlas_tree.layout()
+    if not lay:
+        st = atlas_tree.status()
+        with card("Atlas Passive Tree"):
+            if st["error"] and not st["busy"]:
+                ui.label(st["error"]).classes("pt-note")
+                ui.button("Try again", on_click=lambda: (atlas_tree._state.update(error=None), atlas_tree.ensure(),
+                                                         reload_page())).props("outline no-caps dense")
+            else:
+                with ui.row().classes("items-center gap-3"):
+                    ui.spinner(size="22px", color="primary")
+                    ui.label("Getting the Atlas tree from Grinding Gear Games' official export (a few MB, only once)…")
+                tm = {}
+
+                def poll():
+                    s = atlas_tree.status()
+                    if s["ready"] or (s["error"] and not s["busy"]):
+                        tm["t"].deactivate()
+                        reload_page()
+                tm["t"] = ui.timer(1.0, poll)
+            note(atlas_tree.CREDIT)
+        return
+    got, missing = atlas_tree.match(lay, t["allocated"])
+    with card(f"Atlas Passive Tree · {len(got)} points"):
+        with ui.element("div").classes("pt-atlas w-full"):
+            ui.html(atlas_view.svg(lay, got), sanitize=False).classes("w-full h-full")
+            with ui.element("div").classes("pt-atlas-ctl"):
+                for icon, act, tip in (("add", "in", "Zoom in"), ("remove", "out", "Zoom out"),
+                                       ("fit_screen", "fit", "Show the whole tree")):
+                    ui.button(icon=icon).props(f'flat round dense size=sm data-atlas="{act}"').tooltip(tip)
+        note("Scroll to zoom, drag to move, hover a point for what it does. Your points are lit with gold paths "
+             "between them; pale frames are the ones you could take next."
+             + (f" {len(missing)} point{'s' if len(missing) != 1 else ''} from the log aren't on the current tree "
+                "(the tree changed since)." if missing else ""))
+        note(atlas_tree.CREDIT)
 
 
 # ====================================================================== Currency
@@ -1853,6 +1895,11 @@ document.addEventListener('keydown', onKey, true);
                         note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
                              "shows. The pages keep working out their own numbers, so a finished league still shows where its "
                              "league start ended. Set League back to Automatic to stop forcing.")
+        with card("About"):
+            ui.label("PoE Tracker is a free, fan-made tool. It isn't affiliated with or endorsed by Grinding Gear Games.")
+            note("Path of Exile and its art are © Grinding Gear Games. The Atlas tree is drawn from GGG's official "
+                 "atlastree-export (downloaded the first time you open it, not shipped with the app); its node ids are "
+                 "linked with RePoE, a community export of the game data. Everything the tracker records stays on this PC.")
 
 
 # ====================================================================== warm-up
