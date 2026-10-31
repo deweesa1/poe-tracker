@@ -188,13 +188,11 @@ def overview_page():
         heading("League progression so far", "q-mt-sm")
         kpis([
             ("Time Played", fmt.hours(t["active_s"]), f"over {t['days_played']} days"),
+            ("Average Time Played per Day", fmt.dur(t["active_s"] / t["days_played"], True) if t["days_played"] else "–", "on days you played"),
             ("Time in Campaign", fmt.hours(t["campaign_s"]), f"{fmt.pct(t['campaign_s'] / t['active_s'])} of play" if t["active_s"] else ""),
             ("Time Mapping", fmt.hours(t["mapping_s"]), f"{fmt.pct(t['mapping_s'] / t['active_s'])} of play · {fmt.num(t['maps'])} maps" if t["active_s"] else ""),
-            ("Average Time Played per Day", fmt.dur(t["active_s"] / t["days_played"], True) if t["days_played"] else "–", "on days you played"),
             ("Deaths", fmt.num(t["deaths"]), f"{fmt.num(t['deaths'] / t['maps'], 2)} per map" if t["maps"] else ""),
         ], columns=5)
-
-        voidstone_section(lg)
 
         daily = _fill_days(d["all_daily"], ["active_s", "mapping_s", "campaign_s", "maps", "deaths"])
         with card("Playtime per day"):
@@ -234,46 +232,6 @@ def overview_page():
     with body:
         content()
     auto_refresh(content.refresh)
-
-
-def voidstone_section(lg: str) -> None:
-    v = STATE.cached(("voidstones", lg), lambda c: metrics.voidstones(c, STATE.cfg, lg), league=lg)
-    with card(f"Voidstones · {v['obtained']} of {v['total']}"):
-        with ui.element("div").classes("w-full").style(
-                "display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(max(220px, calc((100% - 36px) / 4)), 1fr))"):
-            for s in v["voidstones"]:
-                got = s["obtained"]
-                border = "var(--lg, #7cb36b)" if got else LINE_C
-                with ui.element("div").classes("pt-kpi").style(f"border-color:{border}"):
-                    if got:
-                        status = (f'<span class="pt-up">{"Likely obtained" if s["likely"] else "Obtained"}</span> · '
-                                  f'{fmt.when(s["when"])}'
-                                  + (f' · day {s["days_into_league"] + 1:.0f}' if s["days_into_league"] is not None else ""))
-                    else:
-                        status = f'<span class="pt-note">{s["steps_done"]} of {s["steps_total"]} bosses down</span>'
-                    steps_html = ""
-                    for st in s["steps"]:
-                        fk = st.get("first_kill")
-                        if st.get("count_only"):
-                            mark, detail = "•", f'{st["attempts"]} run{"s" if st["attempts"] != 1 else ""}'
-                        elif fk:
-                            mark = "✓" if st.get("detected") == "dialogue" else "✓?"
-                            detail = (f'{fmt.when(fk["ts_utc"])} · {fk["character"] or ""}'
-                                      + (f' · {st["attempts_to_kill"]} attempt{"s" if st["attempts_to_kill"] != 1 else ""}'
-                                         if st.get("attempts_to_kill") else ""))
-                        else:
-                            mark = "○"
-                            detail = f'{st["attempts"]} attempt{"s" if st["attempts"] != 1 else ""}' if st["attempts"] else "not attempted"
-                        color = "#7cb36b" if fk else "#a69b8c"
-                        steps_html += (f'<div style="display:flex;gap:8px;margin-top:4px;font-size:12px">'
-                                       f'<span style="color:{color};width:18px">{mark}</span>'
-                                       f'<span style="flex:1"><span style="color:#ece4d8">{st["boss"]}</span><br>'
-                                       f'<span class="pt-note">{detail}</span></span></div>')
-                    ui.html(f'<div class="k">{s["name"]}</div>'
-                            f'<div style="font-size:13px;margin:2px 0 6px">{status}</div>'
-                            f'<div class="pt-note" style="margin-bottom:4px">from {s["from"]}</div>{steps_html}')
-        note("✓ = boss defeat line seen in the log. ✓? = no defeat line exists for this fight, so it counts when you "
-             "leave the arena alive after a while. Voidstones reset every league. The bosses and lines are in milestones.yaml.")
 
 
 def _open_character(row):

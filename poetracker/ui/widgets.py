@@ -232,15 +232,16 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-nav .q-item .q-item__section--side { padding-left: 6px; }
 .pt-nav .q-item.pt-locked:hover { opacity: .7; background: transparent; color: var(--ex-muted); }
 /* overview: league start strip */
-.pt-ls-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; padding: 16px 20px; }
+.pt-ls-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 32px;
+  padding: 18px 24px 16px; }
 .pt-ls-strip .ph { font-family: 'Cinzel', serif; font-weight: 700; font-size: 13px; letter-spacing: .08em;
   color: var(--ex-gold); text-transform: uppercase; }
 .pt-ls-strip .clk { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ex-text); }
 .pt-ls-strip .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-ls-strip .v { font-size: 16px; font-weight: 600; color: var(--ex-text); }
-.pt-ls-strip .nx { flex: 1 1 240px; min-width: 0; }
+.pt-ls-strip .nx { flex: 0 1 300px; min-width: 0; }
 .pt-ls-strip .nx .v { color: var(--ex-gold-hi); }
-.pt-ls-strip .bar { flex-basis: 100%; height: 5px; background: #2d2722; border-radius: 3px; overflow: hidden; }
+.pt-ls-strip .bar { flex-basis: 100%; height: 5px; margin-top: 2px; background: #2d2722; border-radius: 3px; overflow: hidden; }
 .pt-ls-strip .bar i { display: block; height: 100%; background: var(--ex-gold); }
 /* atlas passive tree */
 .pt-atlas { position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
