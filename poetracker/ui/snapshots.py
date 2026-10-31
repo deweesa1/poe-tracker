@@ -250,7 +250,14 @@ _AREAS = {"Weapon": "1 / 1 / 5 / 3", "Offhand": "1 / 7 / 5 / 9", "Weapon2": "1 /
           "Helm": "1 / 4 / 3 / 6", "Amulet": "3 / 6 / 4 / 7", "BodyArmour": "3 / 4 / 6 / 6", "Ring": "4 / 3 / 5 / 4",
           "Ring2": "4 / 6 / 5 / 7", "Gloves": "5 / 1 / 7 / 3", "Belt": "6 / 4 / 7 / 6", "Boots": "5 / 7 / 7 / 9",
           "Trinket": "8 / 2 / 9 / 3"}
-_SOCKET = {"R": "#c0392b", "G": "#3f9a4a", "B": "#3b6fd1", "W": "#e8e8e8", "A": "#2b2b2b", "DV": "#888"}
+_SOCKET = {"R": "#a04034", "G": "#4f8a48", "B": "#4a68a6", "W": "#b9b3a6", "A": "#3a3a3a", "DV": "#7a7a7a"}
+
+
+def _socket_colour(sk: dict) -> str:
+    """sColour is R/G/B/W/A/DV; older answers only have attr (S=red, D=green, I=blue, G=white, A=abyss)."""
+    if sk.get("sColour"):
+        return _SOCKET.get(sk["sColour"], "#777")
+    return _SOCKET.get({"S": "R", "D": "G", "I": "B", "G": "W", "A": "A", "DV": "DV"}.get(sk.get("attr") or "", ""), "#777")
 
 
 def _socket_layout(n: int, w: int) -> list[tuple[int, int]]:
@@ -275,7 +282,7 @@ def _sockets(it: dict) -> str:
             out += f'<i class="lk {"h" if r1 == r2 else "v"}" style="--r:{min(r1, r2)};--c:{min(c1, c2)}"></i>'
     for i, sk in enumerate(socks):
         r, c = pos[i]
-        col = _SOCKET.get(sk.get("sColour") or sk.get("attr") or "", "#777")
+        col = _socket_colour(sk)
         out += f'<b class="{"on" if i in filled else ""}" style="--r:{r};--c:{c};--sc:{col}"></b>'
     return f'<span class="sk" style="--cols:{w};--rows:{rows}">{out}</span>'
 
@@ -363,7 +370,7 @@ def _skills(items: list[dict]) -> str:
             chain = ""
             for n, i in enumerate(idxs):
                 g = gems.get(i)
-                col = _SOCKET.get((socks[i].get("sColour") or socks[i].get("attr") or "") if i < len(socks) else "", "#777")
+                col = _socket_colour(socks[i]) if i < len(socks) else "#777"
                 if n:
                     chain += '<i class="lk"></i>'
                 if not g:

@@ -281,20 +281,19 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-inv .sk b, .pt-inv .sk i { position: absolute; }
 .pt-inv .sk b { width: var(--s); height: var(--s); border-radius: 50%; z-index: 2; box-sizing: border-box;
   left: calc(50% - var(--bw) / 2 + var(--c) * var(--p)); top: calc(50% - var(--bh) / 2 + var(--r) * var(--p));
-  border: 3px solid var(--sc);
+  border: 2px solid color-mix(in srgb, var(--sc) 85%, #000);
   background:
-    radial-gradient(circle at 36% 30%, rgba(255,240,200,.55) 0 4%, transparent 10%),
-    radial-gradient(circle, #0b0806 0 38%, #1c140c 46%, #3a2a16 50%, #f0d48a 55%, #b08a4e 63%, #6b5426 72%, #e2c27a 80%, #4a3820 90%, #20160b 100%);
+    radial-gradient(circle at 36% 30%, rgba(255,235,190,.22) 0 4%, transparent 10%),
+    radial-gradient(circle, #0a0807 0 40%, #17110b 47%, #2e2216 51%, #8c7046 56%, #6a5232 63%, #3e2f1c 72%, #7a6040 80%, #3a2c1a 90%, #1a130b 100%);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.85), 0 2px 4px rgba(0,0,0,.8),
-    inset 0 0 6px color-mix(in srgb, var(--sc) 55%, transparent); }
-.pt-inv .sk b.on { box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.85), 0 2px 4px rgba(0,0,0,.8),
-    inset 0 0 6px color-mix(in srgb, var(--sc) 55%, transparent), 0 0 7px color-mix(in srgb, var(--sc) 70%, transparent); }
+    inset 0 0 5px color-mix(in srgb, var(--sc) 30%, transparent); opacity: .92; }
+.pt-inv .sk b.on { opacity: 1; }
 .pt-inv .sk i { z-index: 1; border-radius: 2px;
-  background: linear-gradient(180deg, #5a4420, #f2d690 50%, #8a6a32); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
+  background: linear-gradient(180deg, #3e2f1c, #9a7c4c 50%, #5a4426); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
 .pt-inv .sk i.h { height: 4px; width: var(--p);
   left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2);
   top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2 - 2px); }
-.pt-inv .sk i.v { width: 4px; height: var(--p); background: linear-gradient(90deg, #5a4420, #f2d690 50%, #8a6a32);
+.pt-inv .sk i.v { width: 4px; height: var(--p); background: linear-gradient(90deg, #3e2f1c, #9a7c4c 50%, #5a4426);
   left: calc(50% - var(--bw) / 2 + var(--c) * var(--p) + var(--s) / 2 - 2px);
   top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2); }
 .pt-paperdoll .set2 { display: none; }
@@ -320,14 +319,14 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-skill .wh { font-size: 13px; color: #6fd3c6; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-skill .chain { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 8px; }
 .pt-skill .chain > i.lk { width: 12px; height: 4px; margin-top: 21px; flex: none; border-radius: 2px;
-  background: linear-gradient(180deg, #5a4420, #f2d690 50%, #8a6a32); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
+  background: linear-gradient(180deg, #3e2f1c, #9a7c4c 50%, #5a4426); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
 .pt-skill .gs { display: flex; flex-direction: column; align-items: center; width: 74px; cursor: help; }
 .pt-skill .gs b { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  box-sizing: border-box; border: 3px solid var(--sc);
+  box-sizing: border-box; border: 2px solid color-mix(in srgb, var(--sc) 85%, #000);
   background:
-    radial-gradient(circle at 36% 30%, rgba(255,240,200,.5) 0 4%, transparent 9%),
-    radial-gradient(circle, #0b0806 0 46%, #1c140c 52%, #3a2a16 56%, #f0d48a 61%, #b08a4e 68%, #6b5426 76%, #e2c27a 84%, #4a3820 92%, #20160b 100%);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.85), 0 0 7px color-mix(in srgb, var(--sc) 55%, transparent); }
+    radial-gradient(circle at 36% 30%, rgba(255,235,190,.2) 0 4%, transparent 9%),
+    radial-gradient(circle, #0a0807 0 47%, #17110b 53%, #2e2216 57%, #8c7046 62%, #6a5232 69%, #3e2f1c 77%, #7a6040 85%, #3a2c1a 92%, #1a130b 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.85), inset 0 0 6px color-mix(in srgb, var(--sc) 25%, transparent); }
 .pt-skill .gs b img { width: 26px; height: 26px; object-fit: contain; }
 .pt-skill .gs.sup b { box-shadow: none; }
 .pt-skill .gs.empty b { opacity: .5; box-shadow: none; }
