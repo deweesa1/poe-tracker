@@ -89,6 +89,50 @@ def _fill_days(daily: list[dict], keys: list[str]) -> list[dict]:
     return out
 
 
+def _league_start_strip() -> None:
+    """During league start: where you are, your timer and the next goal, on top of Overview."""
+    ls = league_start()
+    if ls["phase"] not in ("campaign", "mapping"):
+        return
+    forced = ls["phase"] if ls.get("dev") else None
+    full = STATE.cached(("mini", ls.get("league"), forced),
+                        lambda c: metrics.mini_status(c, STATE.cfg, ls.get("league"), forced), league=ls.get("league"))
+    m = full.get(full.get("view") or ls["phase"]) or {}
+    esc = html.escape
+
+    def stat(k, v):
+        return f'<div><div class="k">{esc(k)}</div><div class="v">{esc(str(v))}</div></div>'
+    if ls["phase"] == "campaign":
+        href, ph = "/campaign", "League Start · Campaign"
+        clock = fmt.clock(m.get("play_s") or 0)
+        nb = m.get("next_boss")
+        nxt = (f"{nb['boss']} (Act {nb['act']}{', ' + nb['zone'] if nb.get('zone') else ''})" if nb else
+               "Finish Act 10" if not m.get("completed") else "Campaign done")
+        stats = [("Where", f"Act {m['act']} · {m['zone'] or ''}" if m.get("act") else "Not started"),
+                 ("Level", m.get("level") or "–"), ("Deaths", m.get("deaths") or 0)]
+        pct = m.get("progress") or 0
+        goal = "Next goal"
+    else:
+        href, ph = "/mapping", "League Start · Mapping"
+        clock = fmt.clock(m.get("mapping_s") or 0)
+        nx = (m.get("next") or [None])[0]
+        nxt = f"{nx['name']} ({nx['group']})" if nx else "All Voidstones"
+        stats = [("Highest tier", fmt.tier(m["top_tier"]) if m.get("top_tier") else "–"),
+                 ("Voidstones", f"{m.get('voidstones') or 0} of {m.get('voidstones_total') or 4}"),
+                 ("Maps", m.get("maps") or 0)]
+        pct = min((m.get("top_tier") or 0), 16) / 16 * 0.5 + (m.get("voidstones") or 0) / (m.get("voidstones_total") or 4) * 0.5
+        goal = "Next voidstone step"
+        if ls.get("end_utc"):
+            stats.append(("Ends by", fmt.when(ls["end_utc"])))
+    with ui.element("div").classes("pt-card w-full cursor-pointer").on("click", lambda: ui.navigate.to(href)).tooltip(
+            "Open " + ("League Start Campaign" if href == "/campaign" else "League Start Mapping")):
+        ui.html(f'<div class="pt-ls-strip"><div><div class="ph">{esc(ph)}</div><div class="clk">{clock}</div>'
+                f'<div class="k" style="text-transform:none;letter-spacing:0">{esc(m.get("character") or "")}</div></div>'
+                + "".join(stat(k, v) for k, v in stats)
+                + f'<div class="nx"><div class="k">{goal}</div><div class="v">{esc(nxt)}</div></div>'
+                f'<div class="bar"><i style="width:{pct * 100:.0f}%"></i></div></div>').classes("w-full")
+
+
 @route("/")
 def overview_page():
     lg = STATE.league()
@@ -103,6 +147,7 @@ def overview_page():
         last = STATE.cached(("last_session", lg, cid), lambda c: metrics.last_session(c, lg, cid), league=lg)
         t = d["totals"]
 
+        _league_start_strip()
         with card("Last session"):
             if not last:
                 empty("No sessions yet.")
@@ -1448,6 +1493,8 @@ def trades_page():
 # ====================================================================== Standard
 @route("/standard")
 def standard_page():
+    if locked("/standard"):
+        return
     lg = STATE.league()
     body = frame("/standard", "Standard", "Every league combined, and how one league compares with the rest",
                  lambda: league_select(_reload, label="Compare league"))
@@ -1690,9 +1737,10 @@ document.addEventListener('keydown', onKey, true);
             ls = league_start()
             phase = ls.get("real_phase") or ls.get("phase")
             days = int(STATE.cfg.settings.get("league_start_days", 14) or 14)
-            ui.label("Campaign pages only until your first character finishes Act 10, then League Start Mapping until "
-                     f"your 4th Voidstone or {days} days after launch. After that every dashboard opens and both League "
-                     "Start pages stay as a record of that league start.").classes("pt-sub")
+            ui.label("While a league starts, only Overview and League Start Campaign are open until your first character "
+                     f"finishes Act 10, then League Start Mapping too until your 4th Voidstone or {days} days after launch. "
+                     "The other pages (Standard included) show in the menu with a lock until then; after that every "
+                     "dashboard opens and both League Start pages stay as a record of that league start.").classes("pt-sub")
             cur = ls.get("league")
             status = {"campaign": "Campaign phase",
                       "mapping": f"Mapping phase ({ls.get('voidstones')} of 4 Voidstones" +

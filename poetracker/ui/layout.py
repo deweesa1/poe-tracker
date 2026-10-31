@@ -126,9 +126,10 @@ STATE = State()
 
 # ---- league start mode ----------------------------------------------------
 # From league launch until the first character finishes Act 10 only League
-# Start Campaign is open (plus Overview, Standard, Settings); then League Start
-# Mapping is added until all four Voidstones; then everything.
-ALWAYS = {"/", "/standard", "/settings"}
+# Start Campaign is open (plus Overview and Settings); then League Start
+# Mapping is added until league start ends; then everything, Standard included.
+# Closed pages stay in the menu, dimmed with a lock, saying what opens them.
+ALWAYS = {"/", "/settings"}
 OPEN_IN = {"campaign": ALWAYS | {"/campaign"}, "mapping": ALWAYS | {"/campaign", "/mapping"}}
 PHASE_PAGE = {"campaign": "/campaign", "mapping": "/mapping"}
 
@@ -180,11 +181,22 @@ def is_open(path: str) -> bool:
     return path in OPEN_IN.get(st["phase"], {path})
 
 
+def unlock_text(path: str) -> str:
+    """What opens a page that's closed during league start."""
+    st = league_start()
+    if path == "/mapping" and st["phase"] == "campaign":
+        return "Opens when your first character finishes Act 10."
+    days = int((STATE.cfg.settings or {}).get("league_start_days", 14) or 14) if STATE.cfg else 14
+    when = f" ({fmt.when(st['end_utc'])} at the latest)" if st.get("end_utc") else ""
+    return f"Opens when league start ends: your 4th Voidstone or {days} days after launch{when}."
+
+
 def locked(path: str) -> bool:
-    """Call first thing in a page: when the page is hidden during league start,
-    go to the page that's open instead and return True."""
+    """Call first thing in a page: when the page is closed during league start,
+    say what opens it, go to the page that's open instead and return True."""
     if is_open(path):
         return False
+    ui.notify(unlock_text(path), position="top", type="info", timeout=4000)
     ui.navigate.to(PHASE_PAGE.get(league_start()["phase"], "/"))
     return True
 
@@ -254,17 +266,21 @@ def build_shell() -> None:
         ui.run_javascript(f"document.body.classList.toggle('pt-mini', {str(now).lower()})")
         toggle_icon.set_name("chevron_right" if now else "chevron_left")
 
-    def nav_item(label, icon, on_click, active=False, trailing=None, tip=None):
-        with ui.item(on_click=on_click).classes("active" if active else "") as it:
+    def nav_item(label, icon, on_click, active=False, trailing=None, tip=None, lock=None):
+        with ui.item(on_click=on_click).classes("active" if active else "pt-locked" if lock else "") as it:
             with ui.item_section().props("avatar").style("min-width:34px"):
                 ui.icon(icon, size="20px")
             ui.item_section(label).classes("q-mini-drawer-hide").style("white-space:nowrap")
-            if trailing:
+            if trailing or lock:
                 with ui.item_section().props("side").classes("q-mini-drawer-hide"):
-                    ui.icon(trailing, size="15px").style("color:var(--ex-dim, #6f665a)")
-            # names show on hover only while the menu is collapsed to icons
-            ui.tooltip(tip or label).props('anchor="center right" self="center left" :offset="[10, 0]"').classes(
-                "pt-nav-tip text-body2")
+                    ui.icon("o_lock" if lock else trailing, size="15px").style("color:var(--ex-dim, #6f665a)")
+            # names show on hover only while the menu is collapsed to icons; a locked
+            # page always says what opens it
+            with ui.tooltip().props('anchor="center right" self="center left" :offset="[10, 0]"').classes(
+                    "text-body2" + ("" if lock else " pt-nav-tip")):
+                ui.label(tip or label).classes("text-weight-medium" if lock else "")
+                if lock:
+                    ui.label(lock).style("max-width:260px;opacity:.85")
         return it
 
     with drawer:
@@ -277,9 +293,17 @@ def build_shell() -> None:
         def draw_nav(path: str) -> None:
             nav_list.clear()
             with nav_list:
-                for href, label, icon in NAV:
+                items = NAV
+                if league_start()["phase"] in PHASE_PAGE:      # the league start path first, then what it opens
+                    first = ("/", "/campaign", "/mapping")
+                    items = sorted(NAV, key=lambda n: first.index(n[0]) if n[0] in first else len(first))
+                for href, label, icon in items:
                     if is_open(href):
                         nav_item(label, icon, lambda h=href: ui.navigate.to(h), active=href == path)
+                    else:
+                        why = unlock_text(href)
+                        nav_item(label, icon, lambda w=why: ui.notify(w, position="top", type="info", timeout=4000),
+                                 tip=f"{label} · locked", lock=why)
             settings_item.classes(add="active") if path == SETTINGS[0] else settings_item.classes(remove="active")
         pt["draw_nav"] = draw_nav
         ui.space()
