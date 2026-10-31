@@ -21,7 +21,32 @@ bosses:
       - "The living toy must enjoy our contests, for it continues to play."
   The Maven's Crucible:
     area: '^MavenHub$'                       # witnessed map-boss gauntlets
-    count_only: true
+    speaker: The Maven
+    # A finished Crucible: she hands out a reward ("Joy... gift.", "Worthy of my
+    # attention, and my prize.") and/or sends you off for more bosses. She only
+    # laughs ("Hahaha!", "Not good.") when you die. Checked against 93 Crucibles.
+    kill_regex: ['(?i)\bgift\b|\bprize\b']
+    kill_lines:
+      - "Go get more."
+      - "Go! More."
+      - "Go. More."
+      - "Get more!"
+      - "More!"
+      - "Again!"
+      - "Again."
+      - "Again! Now!"
+      - "Again! Soon!"
+      - "Repeat this!"
+      - "Repeat this."
+      - "Repeat my challenge."
+      - "Repeat my challenge. Gather more combatants."
+      - "Now go retrieve more challengers for the next round!"
+      - "How long will I be kept waiting?"
+      - "I grow bored already. Go now."
+      - "Another round will commence as soon as I have more combatants."
+      - "Go retrieve more for me."
+      - "Another round, soon."
+      - "I was not bored!"
   The Black Star:
     area: '^MapWorldsPrimordialBoss2$'       # Polaric Void
     speaker: The Black Star

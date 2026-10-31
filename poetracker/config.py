@@ -33,7 +33,8 @@ OLD_DEFAULTS = {
     "mechanics.yaml": {"ef061ed58a3b9d1447d66f29ad9c89367cf6ff6d", "496173c9f9d857a6efcab155affa87b0d157415e",
                        "8ee75f84eebdbdff3f1b2ac19fac4f5f6f2585d7"},
     "log_patterns.yaml": {"060a062dbfcbaa5c11b943dc1c9d5fa2179e7838", "3d63e084bd5858f03398cc067787499c015b785c"},
-    "milestones.yaml": {"18eaea90326edae6cfe7303d00cd1f116df1ed02", "806edb9734d58a5fb28dab6dd75a0fd0906a36f9"},
+    "milestones.yaml": {"18eaea90326edae6cfe7303d00cd1f116df1ed02", "806edb9734d58a5fb28dab6dd75a0fd0906a36f9",
+                        "5bd838b0fa2892b5578a4c637f87a7d8ffe0610d"},
 }
 
 

@@ -1396,7 +1396,7 @@ def mapping_progress(con, config: Config, league: str, status: dict | None = Non
             fk = b.get("first_kill")
             cid = ids_by_name.get(fk["character"]) if fk else None
             ms.append({"group": s["name"], "name": st["boss"], **stamp(fk["ts_utc"] if fk else None, cid),
-                       "attempts": b.get("attempts"), "deaths": b.get("deaths"),
+                       "attempts": b.get("attempts"), "deaths": b.get("deaths"), "kills": b.get("kills"),
                        "likely": b.get("detected") == "likely"})
         ms.append({"group": s["name"], "name": f"{s['name']} obtained", "voidstone": True, **stamp(s["when"]),
                    "likely": s["likely"]})
@@ -1586,7 +1586,8 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
         rows = [x for x in m["milestones"] if x["group"] == s_["name"]]
         got = next((x for x in rows if x.get("voidstone")), {})
         stones.append({"name": s_["name"].replace(" Voidstone", ""), "done": s_["obtained"], "t": clock(got),
-                       "steps": [{"name": x["name"], "done": x["done"], "t": clock(x), "likely": x.get("likely")}
+                       "steps": [{"name": x["name"] + (f" ×{x['kills']}" if (x.get("kills") or 0) > 1 else ""),
+                                  "done": x["done"], "t": clock(x), "likely": x.get("likely")}
                                  for x in rows if not x.get("voidstone")]})
     out["mapping"] = {
         "anchor_utc": last["start_utc"] if last and last["end_utc"] is None and m.get("entered") and not m.get("ended") else None,
