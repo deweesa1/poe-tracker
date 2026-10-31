@@ -236,7 +236,7 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
 
     mini = bool(STATE.pref("drawer_mini", False))
     drawer = ui.left_drawer(value=True, fixed=True).props(
-        f"width=252 mini-width=56 bordered breakpoint=700{' mini' if mini else ''}").classes("q-pa-none column no-wrap")
+        f"width=268 mini-width=56 bordered breakpoint=700{' mini' if mini else ''}").classes("q-pa-none column no-wrap")
     ui.query("body").classes(add="pt-mini" if mini else "", remove="" if mini else "pt-mini")
 
     def toggle_mini():
@@ -269,18 +269,6 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             for href, label, icon in NAV:
                 if is_open(href):
                     nav_item(label, icon, lambda h=href: ui.navigate.to(h), active=href == path)
-        if ls["phase"] in PHASE_PAGE:
-            prog = ("Campaign phase" if ls["phase"] == "campaign" else
-                    f"Mapping · {ls['voidstones']}/{ls['voidstones_total']} Voidstones")
-            with ui.column().classes("q-px-md q-pt-lg gap-0 w-full q-mini-drawer-hide"):
-                ui.label("League start").classes("pt-ls-head")
-                ui.label(prog).style("font-size:12.5px;color:var(--ex-gold-hi, #e6c27a);margin-bottom:4px")
-                for k, v in (("Campaign", ls.get("campaign_name")), ("Mapping", ls.get("mapping_name"))):
-                    if v:
-                        with ui.row().classes("w-full no-wrap gap-2 items-baseline"):
-                            ui.label(k).classes("pt-note").style("font-size:11px;width:54px;flex:none")
-                            ui.label(v).style("font-size:12.5px;color:var(--ex-text, #ece4d8);overflow:hidden;"
-                                              "text-overflow:ellipsis;white-space:nowrap")
         ui.space()
         with ui.column().classes("w-full gap-0 q-pt-sm pt-drawer-foot"):
             with ui.list().classes("pt-nav w-full"):
@@ -335,10 +323,11 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
 </script>""")
 
     with ui.header().classes("items-center q-px-lg q-py-sm gap-4"):
-        with ui.column().classes("gap-0"):
-            ui.label(title).classes("pt-title")
+        with ui.column().classes("gap-0 pt-head"):
+            t = ui.label(title).classes("pt-title")
             if subtitle:
-                ui.label(subtitle).classes("pt-sub text-sm")
+                t.tooltip(subtitle)
+            ui.context.client.pt_tabs_slot = ui.row().classes("pt-head-tabs")
         ui.space()
         if filters:
             with ui.row().classes("items-center gap-3"):
@@ -374,6 +363,16 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
         ui.timer(5, draw_status)
 
     return ui.column().classes("w-full q-pa-lg gap-4").style("max-width:1500px")
+
+
+def head_tabs(value: str, tabs: dict, on_change: Callable) -> ui.tabs:
+    """Page tabs in the top bar, under the page title. Create them outside a
+    page's refreshable content so they survive refreshes."""
+    with ui.context.client.pt_tabs_slot:
+        with ui.tabs(value=value, on_change=on_change).props("dense align=left no-caps inline-label") as t:
+            for name, label in tabs.items():
+                ui.tab(name, label)
+    return t
 
 
 def open_mini() -> None:

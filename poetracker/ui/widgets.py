@@ -129,7 +129,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-sub { color: var(--ex-muted); } .pt-note { color: var(--ex-dim); }
 .q-drawer { background: linear-gradient(180deg, var(--ex-drawer) 0%, var(--ex-bg-2) 100%) !important; border-right: 1px solid var(--ex-line) !important; }
 .q-drawer .text-weight-bold { font-family: 'Cinzel', serif; letter-spacing: .05em; color: var(--ex-gold-hi); }
-.pt-nav .q-item { font-family: 'Cinzel', serif; font-weight: 600; font-size: 13px; letter-spacing: .03em; color: var(--ex-muted);
+.pt-nav .q-item { font-family: 'Cinzel', serif; font-weight: 600; font-size: 12.5px; letter-spacing: .02em; color: var(--ex-muted);
   border-radius: 2px; border-left: 2px solid transparent; }
 .pt-nav .q-item:hover { color: var(--ex-gold-hi); background: var(--ex-a06); }
 .pt-nav .q-item.active { color: var(--ex-gold-hi); border-left-color: var(--ex-gold);
@@ -178,6 +178,16 @@ body, .q-page, .q-layout { color: var(--ex-text);
 
 .q-tab--active { box-shadow: inset 0 2px 0 var(--lg, var(--ex-gold)); }
 .pt-zone-head { font-family: 'Cinzel', serif; letter-spacing: .04em; }
+/* page tabs in the top bar, under the title: words with a gold underline, no boxes */
+.pt-head-tabs { margin-top: 4px; }
+.pt-head-tabs .q-tabs { border-bottom: 0; min-height: 0; }
+.pt-head-tabs .q-tab { background: transparent !important; border: 0 !important; box-shadow: none !important;
+  border-radius: 0; min-height: 28px; padding: 0 2px; margin-right: 18px; font-size: 12.5px; color: var(--ex-muted); }
+.pt-head-tabs .q-tab:hover { color: var(--ex-gold-hi); }
+.pt-head-tabs .q-tab--active { color: var(--ex-gold-hi) !important; }
+.pt-head-tabs .q-tab__indicator { display: block !important; height: 2px; background: var(--ex-gold); opacity: 0; }
+.pt-head-tabs .q-tab--active .q-tab__indicator { opacity: 1; }
+.pt-head-tabs .q-tab .q-focus-helper { display: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--ex-bg-2); }
 ::-webkit-scrollbar-thumb { background: var(--ex-line); border: 2px solid var(--ex-bg-2); border-radius: 6px; }
 """

@@ -7,7 +7,8 @@ from nicegui import ui
 
 from .. import captures, config as config_mod, db, metrics
 from . import fmt
-from .layout import STATE, auto_refresh, character_select, frame, is_open, league_select, league_start, locked
+from .layout import (STATE, auto_refresh, character_select, frame, head_tabs, is_open, league_select, league_start,
+                     locked)
 from .widgets import LINE as LINE_C
 from .widgets import (BLUE, GOLD, GREY, HOURS_TIP, PALETTE, RED, TEAL, card, chart, empty, heading, kpis, note, table)
 
@@ -232,12 +233,10 @@ def maps_page():
     cid = STATE.character(lg)
     body = frame("/maps", "Maps", _scope(), _filters_league_char)
     tab = STATE.pref("maps_tab", "runs")
+    tabs = head_tabs(tab, {"runs": "Maps Ran", "copied": "Detailed Maps"},
+                     lambda e: STATE.set_pref("maps_tab", e.value))
 
     with body:
-        with ui.tabs(value=tab, on_change=lambda e: STATE.set_pref("maps_tab", e.value)).props(
-                "dense align=left active-color=primary indicator-color=primary").classes("text-grey-5") as tabs:
-            ui.tab("runs", "Maps Ran")
-            ui.tab("copied", "Detailed Maps")
         with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
             with ui.tab_panel("runs").classes("q-pa-none"):
                 runs_tab(lg, cid)
@@ -552,6 +551,9 @@ def campaign_page():
            f"{lock['name']} · furthest along (first to finish Act 10 takes this)") if lock["id"] else ""
     body = frame("/campaign", "League Start Campaign", " · ".join(x for x in (lg, who) if x),
                  None if live else (lambda: league_select(_reload)))
+    holder: dict = {"tabs": head_tabs(STATE.pref("campaign_tab", "splits"),
+                                      {"splits": "Progress", "zones": "Acts", "checklist": "Checklist"},
+                                      lambda e: STATE.set_pref("campaign_tab", e.value))}
 
     @ui.refreshable
     def content():
@@ -569,17 +571,8 @@ def campaign_page():
 
         def rate(v):
             return "–" if v is None else fmt.num(v, 1)
-        tab = STATE.pref("campaign_tab", "splits")
-
-        def tab_changed(e):
-            STATE.set_pref("campaign_tab", e.value)
-        with ui.tabs(value=tab, on_change=tab_changed).props(
-                "dense align=left active-color=primary indicator-color=primary").classes("text-grey-5") as tabs:
-            ui.tab("splits", "Progress")
-            ui.tab("zones", "Acts")
-            ui.tab("checklist", "Checklist")
-        holder["tabs"] = tabs
-        with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
+        tabs = holder["tabs"]
+        with ui.tab_panels(tabs, value=tabs.value).classes("w-full bg-transparent").props("animated=false"):
             with ui.tab_panel("splits").classes("q-pa-none"):
                 with ui.column().classes("w-full gap-4"):
                     after = sp["after_league_start_s"]
@@ -759,8 +752,6 @@ def campaign_page():
                              "a zone from an earlier act shows the act it belongs to. Visits above 1 mean you went back.")
 
 
-    holder: dict = {}
-
     def act_jump(e):
         n = int(str(e.args).strip('[]"\' '))
         if holder.get("tabs"):
@@ -820,7 +811,9 @@ def mapping_page():
            f"{lock['name']} · highest tier so far (first to a T16 map takes this)") if lock.get("id") else ""
     body = frame("/mapping", "League Start Mapping", " · ".join(x for x in (lg, who) if x),
                  None if live else (lambda: league_select(_reload)))
-    holder: dict = {}
+    holder: dict = {"tabs": head_tabs(STATE.pref("mapping_tab", "progress"),
+                                      {"progress": "Progress", "voidstones": "Voidstones", "checklist": "Checklist"},
+                                      lambda e: STATE.set_pref("mapping_tab", e.value))}
 
     @ui.refreshable
     def content():
@@ -830,14 +823,8 @@ def mapping_page():
         k = m["kpis"]
         if not k:
             return empty("No characters in this league yet.")
-        tab = STATE.pref("mapping_tab", "progress")
-        with ui.tabs(value=tab, on_change=lambda e: STATE.set_pref("mapping_tab", e.value)).props(
-                "dense align=left active-color=primary indicator-color=primary").classes("text-grey-5") as tabs:
-            ui.tab("progress", "Progress")
-            ui.tab("voidstones", "Voidstones")
-            ui.tab("checklist", "Checklist")
-        holder["tabs"] = tabs
-        with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
+        tabs = holder["tabs"]
+        with ui.tab_panels(tabs, value=tabs.value).classes("w-full bg-transparent").props("animated=false"):
             with ui.tab_panel("progress").classes("q-pa-none"):
                 with ui.column().classes("w-full gap-4"):
                     _mapping_progress(lg, m)
