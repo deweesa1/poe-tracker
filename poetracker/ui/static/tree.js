@@ -13,11 +13,13 @@
 
   // ---- the hover card (tree nodes and items share it)
   let tipEl = null, tipKey = null;
-  function tip(e, key, title, text, note, colour, base, extra) {
+  function tip(e, key, title, text, note, colour, base, extra, html) {
     if (!tipEl) { tipEl = document.createElement("div"); tipEl.id = "pt-atlas-tip"; document.body.appendChild(tipEl); }
     if (key !== tipKey) {
       tipKey = key;
-      tipEl.innerHTML = `<b style="${colour ? "color:" + colour : ""}">${esc(title)}</b>` +
+      tipEl.classList.toggle("card", !!html);
+      if (html) { tipEl.innerHTML = html; tipEl.style.display = "block"; }
+      else tipEl.innerHTML = `<b style="${colour ? "color:" + colour : ""}">${esc(title)}</b>` +
         (base ? `<div style="color:#c8c8c8">${esc(base)}</div>` : "") +
         (text ? String(text).split("\n").map((x) => `<div>${esc(x)}</div>`).join("") : "") +
         (extra ? `<div style="color:#4fb3a5">${esc(extra)}</div>` : "") +
@@ -33,7 +35,7 @@
     if (e.target.closest && e.target.closest(".pt-canvas")) return;    // the tree does its own
     const g = e.target.closest && e.target.closest(".pt-tipable");
     if (!g) { if (tipKey && !String(tipKey).startsWith("t:")) untip(); return; }
-    tip(e, g, g.dataset.n, g.dataset.s, g.dataset.a, g.dataset.c, g.dataset.b, g.dataset.g);
+    tip(e, g, g.dataset.n, g.dataset.s, g.dataset.a, g.dataset.c, g.dataset.b, g.dataset.g, g.dataset.tip);
   });
 
   // ---- the tree viewer

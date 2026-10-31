@@ -46,6 +46,100 @@ def _mods_tip(it: dict) -> str:
     return "\n".join(x for x in lines if x)
 
 
+# ---- the item card, laid out like the game's ------------------------------
+_VAL = {0: "#e8e2d4", 1: "#8888ff", 2: "#8888ff", 3: "#8888ff", 4: "#d04c2c", 5: "#4f8fd8", 6: "#e6c84a", 7: "#c74fa8"}
+_FRAME = {0: "normal", 1: "magic", 2: "rare", 3: "unique", 4: "gem", 5: "currency", 6: "divination", 9: "relic", 10: "relic"}
+_INFLUENCE = {"shaper": "Shaper", "elder": "Elder", "crusader": "Crusader", "redeemer": "Redeemer", "hunter": "Hunter",
+              "warlord": "Warlord", "searing": "Searing Exarch", "tangled": "Eater of Worlds"}
+
+
+def _prop_line(p: dict) -> str:
+    """One property line ("Armour: 324", "Quality: +20%"), values coloured like the game."""
+    name = str(p.get("name") or "")
+    vals = p.get("values") or []
+    cv = [f'<span style="color:{_VAL.get(v[1] if len(v) > 1 else 0, "#e8e2d4")}">{esc(str(v[0]))}</span>' for v in vals]
+    if "{0}" in name:
+        out = esc(name)
+        for i, v in enumerate(cv):
+            out = out.replace("{" + str(i) + "}", v)
+        return out
+    if not vals:
+        return esc(name)
+    return f"{esc(name)}: " + ", ".join(cv)
+
+
+def item_card(it: dict, gems_line: str = "") -> str:
+    """The hover card for an item: header in its rarity colour, properties, requirements,
+    then enchant / implicit / fractured / explicit / crafted / foulborn mods, flavour and flags."""
+    frame = _FRAME.get(it.get("frameType"), "normal")
+    name, base = it.get("name") or "", it.get("typeLine") or it.get("baseType") or ""
+    tags = [label for k, label in _INFLUENCE.items() if (it.get("influences") or {}).get(k) or it.get(k) is True]
+    for k, label in (("fractured", "Fractured"), ("synthesised", "Synthesised"), ("mutated", "Foulborn"),
+                     ("split", "Split"), ("mirrored", "Mirrored"), ("veiled", "Veiled")):
+        if it.get(k):
+            tags.append(label)
+    head = (f'<div class="ic-head {frame}">' + (f'<div>{esc(name)}</div>' if name else "") + f'<div>{esc(base)}</div>'
+            + (f'<div class="ic-tags">{" · ".join(esc(t) for t in tags)}</div>' if tags else "") + "</div>")
+    blocks = []
+    props = [_prop_line(p) for p in it.get("properties") or []]
+    if props:
+        blocks.append("".join(f'<div class="ic-prop">{x}</div>' for x in props))
+    req, extra = it.get("requirements") or [], ""
+    if req:
+        parts = []
+        for r in req:
+            v = (r.get("values") or [[""]])[0][0]
+            parts.append(f'{esc(r.get("name"))} <b>{esc(str(v))}</b>' if r.get("name") == "Level" else
+                         f'<b>{esc(str(v))}</b> {esc(r.get("name"))}')
+        extra += f'<div class="ic-req">Requires {", ".join(parts)}</div>'
+    if it.get("ilvl") and it.get("frameType") != 4:
+        extra += f'<div class="ic-req">Item Level: <b>{it["ilvl"]}</b></div>'
+    if it.get("secDescrText"):
+        extra += f'<div class="ic-req" style="color:#1ba29b">{esc(it["secDescrText"])}</div>'
+    if extra:
+        blocks.append(extra)
+
+    def mods(key, cls):
+        return "".join(f'<div class="ic-mod {cls}">{esc(_mod_text(m))}</div>' for m in it.get(key) or [] if m)
+    for group in (mods("enchantMods", "ench"), mods("scourgeMods", "ench"), mods("utilityMods", "ench"),
+                  mods("implicitMods", "impl"),
+                  mods("fracturedMods", "frac") + mods("explicitMods", "expl") + mods("veiledMods", "expl")
+                  + mods("craftedMods", "craft") + mods("crucibleMods", "craft") + mods("runeMods", "craft")
+                  + mods("desecratedMods", "craft") + mods("mutatedMods", "foul")):
+        if group:
+            blocks.append(group)
+    if it.get("flavourText"):
+        blocks.append('<div class="ic-flav">' + "".join(f"<div>{esc(str(x))}</div>" for x in it["flavourText"]) + "</div>")
+    if it.get("corrupted"):
+        blocks.append('<div class="ic-corrupt">Corrupted</div>')
+    if gems_line:
+        blocks.append(f'<div class="ic-gems">{esc(gems_line)}</div>')
+    return f'<div class="ic">{head}<div class="ic-body">{"<hr>".join(blocks)}</div></div>'
+
+
+def _quality(it: dict) -> str:
+    for p in it.get("properties") or []:
+        if str(p.get("name", "")).startswith("Quality") and p.get("values"):
+            return str(p["values"][0][0])
+    return ""
+
+
+def defences(items: list[dict]) -> dict:
+    """Armour / evasion / energy shield / ward listed on your equipped gear (each item's own
+    numbers, with its quality and local mods; not your character's totals)."""
+    out = {"Armour": 0, "Evasion Rating": 0, "Energy Shield": 0, "Ward": 0}
+    for it in items:
+        if it.get("inventoryId") in ("Weapon2", "Offhand2", "Flask", "Trinket"):
+            continue
+        for p in it.get("properties") or []:
+            if p.get("name") in out and p.get("values"):
+                try:
+                    out[p["name"]] += int(str(p["values"][0][0]).replace(",", ""))
+                except ValueError:
+                    pass
+    return out
+
+
 def _gems(it: dict) -> list[str]:
     out = []
     for g in it.get("socketedItems") or []:
@@ -221,6 +315,12 @@ def _show(snap: dict | None, prev: dict | None) -> None:
         abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
         with ui.column().classes("gap-3").style("flex:none"):
             ui.html(_paperdoll(items), sanitize=False)
+            dv = {k: v for k, v in defences(items).items() if v}
+            if dv:
+                ui.html('<div class="pt-def">' + "".join(
+                    f'<span class="{k.split()[0].lower()}"><small>{esc(k)}</small>{v:,}</span>' for k, v in dv.items())
+                    + '</div><div class="pt-note" style="font-size:11px;margin-top:-6px">On your gear (each item\'s own '
+                    'numbers, before your passives and other bonuses)</div>')
             if jewels or abyss:
                 ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
                 ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
@@ -299,9 +399,9 @@ def _paperdoll(items: list[dict]) -> str:
         icon = it.get("icon") or ""
         return (f'<div class="pt-inv pt-tipable {extra}" style="grid-area:{area}" data-n="{esc(name or base)}" '
                 f'data-b="{esc(base if name else "")}" data-c="{RARITY.get(it.get("frameType"), "#c8c8c8")}" '
-                f'data-s="{esc(_mods_tip(it))}" data-g="{esc(gems)}">'
+                f'data-tip="{esc(item_card(it, gems))}">'
                 + (f'<img src="{esc(icon)}" alt="" loading="lazy">' if icon else f'<span>{esc(name or base)}</span>')
-                + _sockets(it) + "</div>")
+                + _sockets(it) + (f'<u class="q">{esc(q)}</u>' if (q := _quality(it)) else "") + "</div>")
     html_ = ""
     has_swap = bool(by.get("Weapon2") or by.get("Offhand2"))
     for key, area in _AREAS.items():
@@ -378,13 +478,11 @@ def _skills(items: list[dict]) -> str:
                     continue
                 lvl, qual = _gem_props(g)
                 sup = bool(g.get("support"))
-                props = "\n".join(f'{p.get("name")}: {", ".join(str(v[0]) for v in p.get("values") or [])}'
-                                   for p in g.get("properties") or [] if p.get("name") and p.get("values"))
                 name = g.get("typeLine") or g.get("baseType") or "?"
                 short = name.replace(" Support", "")
                 img = f'<img src="{esc(g["icon"])}" alt="" loading="lazy">' if g.get("icon") else ""
-                chain += (f'<span class="gs pt-tipable{" sup" if sup else ""}" style="--sc:{col}" data-n="{esc(name)}" '
-                          f'data-c="#1ba29b" data-s="{esc(props)}" data-a="{"Support gem" if sup else "Skill gem"}">'
+                chain += (f'<span class="gs pt-tipable{" sup" if sup else ""}" style="--sc:{col}" '
+                          f'data-tip="{esc(item_card(g))}">'
                           f'<b>{img}</b>'
                           f'<em>{esc(lvl or "?")}{("/" + esc(qual) + "%") if qual else ""}</em>'
                           f'<small>{esc(short)}</small></span>')
@@ -400,6 +498,6 @@ def _skills(items: list[dict]) -> str:
 def _jewel_row(j: dict) -> str:
     col = RARITY.get(j.get("frameType"), "#c8c8c8")
     return (f'<div class="pt-jewel pt-tipable" data-n="{esc(j.get("name") or j.get("typeLine") or "")}" '
-            f'data-b="{esc(j.get("typeLine") if j.get("name") else "")}" data-c="{col}" data-s="{esc(_mods_tip(j))}">'
+            f'data-tip="{esc(item_card(j))}">'
             + (f'<img src="{esc(j.get("icon") or "")}" alt="" loading="lazy">' if j.get("icon") else "")
             + f'<span style="color:{col}">{esc(_item_name(j))}</span></div>')

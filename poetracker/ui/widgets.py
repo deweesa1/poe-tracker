@@ -348,6 +348,40 @@ body, .q-page, .q-layout { color: var(--ex-text);
 #pt-atlas-tip { position: fixed; z-index: 9999; display: none; max-width: 340px; pointer-events: none; padding: 10px 12px;
   background: rgba(12,10,8,.96); border: 1px solid var(--ex-gold, #c9a35a); border-radius: 3px; font-size: 13px;
   line-height: 1.4; color: #b9b2c9; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+/* item card: centred like the game's, header tinted by rarity */
+#pt-atlas-tip.card { padding: 0; max-width: 430px; min-width: 260px; border-color: #5a4a30; background: #0b0907; }
+#pt-atlas-tip .ic-head { text-align: center; padding: 6px 14px; font-family: 'Cinzel', serif; font-size: 15px; line-height: 1.3;
+  border-bottom: 1px solid #3a3020; }
+#pt-atlas-tip .ic-head.normal { color: #d8d3c6; background: linear-gradient(180deg, #2a2724, #1a1816); }
+#pt-atlas-tip .ic-head.magic { color: #9a9aff; background: linear-gradient(180deg, #1c1e38, #121326); }
+#pt-atlas-tip .ic-head.rare { color: #ece27a; background: linear-gradient(180deg, #2e2914, #1c190c); }
+#pt-atlas-tip .ic-head.unique { color: #d0874a; background: linear-gradient(180deg, #33200f, #1f1409); }
+#pt-atlas-tip .ic-head.gem { color: #3cb8ac; background: linear-gradient(180deg, #102a28, #0a1a19); }
+#pt-atlas-tip .ic-head.relic { color: #82ad6a; background: linear-gradient(180deg, #1c2a14, #12190c); }
+#pt-atlas-tip .ic-tags { font-family: Inter, sans-serif; font-size: 11px; letter-spacing: .04em; color: #c9a35a; opacity: .9; }
+#pt-atlas-tip .ic-body { padding: 8px 14px 10px; text-align: center; font-size: 13px; line-height: 1.45; }
+#pt-atlas-tip .ic-body hr { border: 0; height: 1px; margin: 6px 20px;
+  background: linear-gradient(90deg, transparent, #6b5a3e, transparent); }
+#pt-atlas-tip .ic-head div, #pt-atlas-tip .ic-flav div { color: inherit; }
+#pt-atlas-tip .ic-prop, #pt-atlas-tip .ic-req { color: #8f8a80; }
+#pt-atlas-tip .ic-req b { color: #e8e2d4; font-weight: 600; display: inline; font-family: inherit; font-size: inherit; margin: 0; }
+#pt-atlas-tip .ic-mod.impl, #pt-atlas-tip .ic-mod.expl { color: #8f8fe8; }
+#pt-atlas-tip .ic-mod.ench { color: #b8c8f0; }
+#pt-atlas-tip .ic-mod.craft { color: #b4b4ff; font-style: italic; }
+#pt-atlas-tip .ic-mod.frac { color: #b09a6a; }
+#pt-atlas-tip .ic-mod.foul { color: #c07ad8; }
+#pt-atlas-tip .ic-flav { color: #a8683a; font-style: italic; }
+#pt-atlas-tip .ic-corrupt { color: #c8423a; }
+#pt-atlas-tip .ic-gems { color: #3cb8ac; }
+/* quality badge on an inventory item, and the defence totals under the inventory */
+.pt-inv u.q { position: absolute; right: 2px; bottom: 1px; z-index: 3; text-decoration: none; font-size: 10px; font-weight: 700;
+  color: #b9b3e8; background: rgba(0,0,0,.65); border-radius: 3px; padding: 0 3px; }
+.pt-def { display: flex; gap: 6px; flex-wrap: wrap; }
+.pt-def span { display: flex; flex-direction: column; padding: 4px 10px; border: 1px solid var(--ex-line); border-radius: 3px;
+  background: rgba(0,0,0,.25); font-size: 15px; font-weight: 700; color: var(--ex-text); line-height: 1.2; }
+.pt-def small { font-size: 10px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
+.pt-def .armour { border-left: 3px solid #a04034; } .pt-def .evasion { border-left: 3px solid #4f8a48; }
+.pt-def .energy { border-left: 3px solid #4a68a6; } .pt-def .ward { border-left: 3px solid #b9b3a6; }
 #pt-atlas-tip b { display: block; font-family: 'Cinzel', serif; color: var(--ex-gold-hi, #e6c27a); font-size: 14px; margin-bottom: 4px; }
 #pt-atlas-tip div { color: #8f8fe0; }
 #pt-atlas-tip i { display: block; margin-top: 6px; color: var(--ex-muted, #a69b8c); font-style: normal; font-size: 12px; }
