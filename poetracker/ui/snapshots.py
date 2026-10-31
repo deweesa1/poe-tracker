@@ -511,7 +511,8 @@ def _paperdoll(items: list[dict]) -> str:
             html_ += f'<div class="pt-inv empty" style="grid-area:7 / {3 + x} / 9 / {4 + x}"></div>'
     swap = ('<div class="pt-swap"><button class="on" data-set="1">I</button><button data-set="2">II</button></div>'
             if has_swap else "")
-    return f'<div class="pt-paperdoll">{swap}<div class="grid">{html_}</div></div>'
+    tog = '<label class="pt-socktog"><input type="checkbox" checked> Sockets</label>'
+    return f'<div class="pt-paperdoll">{swap}{tog}<div class="grid">{html_}</div></div>'
 
 
 def _gem_props(g: dict) -> tuple[str, str]:

@@ -284,12 +284,15 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-charhead .nm { font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; letter-spacing: .03em; color: var(--ex-gold-hi); line-height: 1.15; }
 .pt-charhead .cl { font-size: 15px; color: var(--ex-text); margin-top: 2px; }
 .pt-charhead .dt { font-size: 12.5px; color: var(--ex-muted); margin-top: 2px; }
-.pt-charhead .tiles { display: grid; grid-template-columns: repeat(4, minmax(110px, auto)); gap: 0 28px; }
-.pt-charhead .tiles div { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 14px; border-left: 1px solid var(--ex-line); }
+.pt-charhead .tiles { display: grid; grid-template-columns: repeat(4, 150px); gap: 0; }
+.pt-charhead .tiles div { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 2px 10px; border-left: 1px solid var(--ex-line); }
+.pt-charhead .tiles div:last-child { border-right: 1px solid var(--ex-line); }
 .pt-charhead .tiles small { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-charhead .tiles b { font-size: 26px; font-weight: 700; color: var(--ex-text); line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pt-charhead .tiles i { font-style: normal; font-size: 12px; color: var(--ex-muted); white-space: nowrap; }
-@media (max-width: 900px) { .pt-charhead .tiles { grid-template-columns: repeat(2, minmax(110px, auto)); gap: 10px 20px; } }
+@media (max-width: 1100px) { .pt-charhead .tiles { grid-template-columns: repeat(4, 120px); } }
+@media (max-width: 760px) { .pt-charhead .tiles { grid-template-columns: repeat(2, 130px); row-gap: 10px; } }
 /* snapshot: the inventory as the game draws it, jewels, skills */
 .pt-snaphead { font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--ex-gold-hi); }
 .pt-paperdoll { position: relative; flex: none; padding: 34px 18px 18px; border-radius: 4px;
@@ -327,6 +330,10 @@ body, .q-page, .q-layout { color: var(--ex-text);
   top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2); }
 .pt-paperdoll .set2 { display: none; }
 .pt-paperdoll.alt .set1 { display: none; } .pt-paperdoll.alt .set2 { display: flex; }
+.pt-socktog { position: absolute; top: 6px; right: 18px; display: flex; align-items: center; gap: 5px; cursor: pointer;
+  font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ex-muted); user-select: none; }
+.pt-socktog input { accent-color: #c9a35a; width: 13px; height: 13px; margin: 0; cursor: pointer; }
+.pt-paperdoll.nosock .sk { display: none; }
 .pt-swap { position: absolute; top: 8px; left: 18px; display: flex; gap: 3px; }
 .pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
   background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }

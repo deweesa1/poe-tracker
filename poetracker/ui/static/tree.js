@@ -242,3 +242,19 @@ const ptFitRows = () => document.querySelectorAll(".pt-charpick").forEach((p) =>
 });
 new MutationObserver(ptFitRows).observe(document.body, { childList: true, subtree: true });
 window.addEventListener("resize", ptFitRows);
+
+// sockets on / off on the inventory (remembered in this browser)
+const ptSockPref = () => { try { return localStorage.getItem("pt-sockets") !== "0"; } catch (e) { return true; } };
+document.addEventListener("change", (e) => {
+  const box = e.target.closest(".pt-socktog input"); if (!box) return;
+  box.closest(".pt-paperdoll").classList.toggle("nosock", !box.checked);
+  try { localStorage.setItem("pt-sockets", box.checked ? "1" : "0"); } catch (err) { /* private window */ }
+});
+new MutationObserver(() => {
+  document.querySelectorAll(".pt-paperdoll:not([data-sk])").forEach((d) => {
+    d.dataset.sk = "1";
+    const on = ptSockPref();
+    d.classList.toggle("nosock", !on);
+    const i = d.querySelector(".pt-socktog input"); if (i) i.checked = on;
+  });
+}).observe(document.body, { childList: true, subtree: true });
