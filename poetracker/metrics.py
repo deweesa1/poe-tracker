@@ -1419,7 +1419,7 @@ def mapping_progress(con, config: Config, league: str, status: dict | None = Non
                                    (mchar, e_ts, lim)).fetchone()[0]
         entered = {"ts_utc": e_ts, "tier": first["tier"], "area": first["area_name"],
                    "after_launch_s": _secs(lg_start, e_ts) if lg_start else None, "level": lvl_in,
-                   "played_s": map_s}
+                   "played_s": map_s, "start_played_s": e_played}
         # tiers: when each was first reached, on this character's play clock
         reach = {}
         for r in runs_:
@@ -1576,14 +1576,26 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
     afk = con.execute("SELECT 1 FROM afk_period WHERE session_id=? AND end_utc IS NULL LIMIT 1",
                       (last["session_id"],)).fetchone() if last else None
     rt = m.get("rates") or {}
+    # voidstones with their steps, timed on the mapping clock (play time since the first map)
+    base = (m.get("entered") or {}).get("start_played_s")
+
+    def clock(x):
+        return (x["played_s"] - base) if x.get("done") and x.get("played_s") is not None and base is not None else None
+    stones = []
+    for s_ in (m.get("voidstones") or {}).get("voidstones") or []:
+        rows = [x for x in m["milestones"] if x["group"] == s_["name"]]
+        got = next((x for x in rows if x.get("voidstone")), {})
+        stones.append({"name": s_["name"].replace(" Voidstone", ""), "done": s_["obtained"], "t": clock(got),
+                       "steps": [{"name": x["name"], "done": x["done"], "t": clock(x), "likely": x.get("likely")}
+                                 for x in rows if not x.get("voidstone")]})
     out["mapping"] = {
         "anchor_utc": last["start_utc"] if last and last["end_utc"] is None and m.get("entered") and not m.get("ended") else None,
         "ended": (m.get("ended") or {}).get("ts_utc"),
         "afk": bool(afk), "zone": last["area_name"] if last else None,
         "maps_per_h": rt.get("maps_per_h"), "tiers_per_h": rt.get("tiers_per_h"),
         "bar": [b["state"] for b in m.get("bar") or []],
-        "stones": [{"name": s["name"].replace(" Voidstone", ""), "done": s["obtained"]}
-                   for s in (m.get("voidstones") or {}).get("voidstones") or []],
+        "stones": stones,
+        "end_reason": (m.get("ended") or {}).get("reason"),
         "character": m.get("character"), "top_tier": k.get("top_tier"), "maps": k.get("maps"),
         "voidstones": k.get("voidstones"), "voidstones_total": k.get("voidstones_total"),
         "level": k.get("level"), "mapping_s": k.get("mapping_played_s"), "deaths": rt.get("deaths", k.get("map_deaths")),

@@ -203,18 +203,31 @@ def run_mini() -> int:
             state["collapsed"] = bool(collapsed)
             save()            # the page then fits the window's height to what's shown
 
-        def fit(self, css_w, css_h, inner_w, inner_h):
+        def fit(self, css_w, css_h, inner_w, inner_h, animate=False):
             """Resize to a size given in page pixels (the page also sends its own
             current size, which converts them to window units whatever the
-            display scaling)."""
+            display scaling). animate: slide the height there over ~0.2 s."""
             try:
-                w, h = win.width, win.height
+                w0, h0 = win.width, win.height
+                w, h = w0, h0
                 if css_w and inner_w:
-                    w = max(200, round(w * float(css_w) / float(inner_w)))
+                    w = max(200, round(w0 * float(css_w) / float(inner_w)))
                 if css_h and inner_h:
-                    h = max(60, round(h * float(css_h) / float(inner_h)))
-                if (w, h) != (win.width, win.height):
+                    h = max(60, round(h0 * float(css_h) / float(inner_h)))
+                if (w, h) == (w0, h0):
+                    return
+                anim["gen"] += 1
+                gen = anim["gen"]
+                if not animate or abs(h - h0) < 12:
                     win.resize(int(w), int(h))
+                    return
+                steps = 10
+                for i in range(1, steps + 1):
+                    if anim["gen"] != gen:          # a newer resize took over
+                        return
+                    e = 1 - (1 - i / steps) ** 3    # ease out
+                    win.resize(int(w), int(round(h0 + (h - h0) * e)))
+                    time.sleep(0.018)
             except Exception:
                 log.debug("fit failed", exc_info=True)
 
@@ -233,6 +246,7 @@ def run_mini() -> int:
         _save_prefs(p)
 
     closing = threading.Event()
+    anim = {"gen": 0}
     win = webview.create_window(
         TITLE, url + "/mini", js_api=Api(), width=int(p.get("width", 300)), height=int(p.get("height", 380)),
         x=p.get("x"), y=p.get("y"), frameless=True, easy_drag=True, on_top=True, resizable=True,

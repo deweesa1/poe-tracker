@@ -39,6 +39,12 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
   margin: 9px 0 3px; border-bottom: 1px solid var(--ex-line-dim); padding-bottom: 2px; }
 .m-splits { display: flex; flex-direction: column; }
 .m-split { display: flex; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.55; white-space: nowrap; }
+.m-stone { display: flex; font-size: 12.5px; margin-top: 4px; color: var(--ex-text); font-weight: 600; white-space: nowrap; }
+.m-stone.ok { color: var(--ex-gold-hi); } .m-stone .a { flex: 1; } .m-stone .t { font-variant-numeric: tabular-nums; }
+.m-step { display: flex; gap: 6px; font-size: 11.5px; line-height: 1.5; padding-left: 16px; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.m-step .k { width: 16px; color: var(--ex-gold); } .m-step .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.m-step .t { color: var(--ex-muted); } .m-step.todo { color: var(--ex-dim); } .m-step.todo .k { color: var(--ex-dim); }
 .m-split .a { width: 58px; color: var(--ex-muted); } .m-split .t { flex: 1; } .m-split .d { color: var(--ex-dim); font-size: 11px; }
 .m-split.cur .a, .m-split.cur .t { color: var(--ex-gold-hi); } .m-split.todo { color: var(--ex-dim); }
 
@@ -63,6 +69,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
 .m-bar div i.skip { background: var(--ex-line); }
 .m-dim { color: var(--ex-dim); font-size: 12px; margin-top: 8px; }
 .m-body { flex: 0 0 auto; }
+.m-body.m-fade { animation: ptfade .35s ease-out; }
+@keyframes ptfade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .m-foot { flex: 0 0 auto; padding-top: 4px; font-size: 10.5px; color: var(--ex-dim);
   display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
 
@@ -96,17 +104,41 @@ TICK_JS = """
     const b = document.querySelector('.m-btns .l');
     if (b) { b.textContent = locked ? '🔒' : '🔓'; b.title = locked ? 'Unlock to move or resize' : 'Lock in place'; }
   };
-  window.ptSetCollapsed = function (c) {
+  function setCollapsedClass(c) {
     window.ptCollapsed = c;
     document.querySelectorAll('.mini').forEach(el => el.classList.toggle('collapsed', c));
     const b = document.querySelector('.m-btns .c');
-    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show acts and labs' : 'Only the timer and act bar'; }
-    window.ptFit();
-  };
+    if (b) { b.textContent = c ? '▸' : '▾'; b.title = c ? 'Show everything' : 'Only the timer and bar'; }
+  }
+  function measure() {
+    const m = document.querySelector('.mini');
+    return m ? Math.ceil(m.getBoundingClientRect().bottom) : 0;
+  }
+  window.ptSetCollapsed = function (c) { setCollapsedClass(c); window.ptFit(); };
+  // Collapsing slides the window shut and only then hides the rows;
+  // expanding shows the rows and slides the window open.
   window.ptToggleCollapse = function () {
     const c = !window.ptCollapsed;
-    window.ptSetCollapsed(c);
     ptApi('set_collapsed', c);
+    window.ptAnimating = Date.now() + 450;      // ignore resize events while it slides
+    if (c) {
+      setCollapsedClass(true); const target = measure(); setCollapsedClass(false);
+      window.ptCollapsed = true;     // stop ptFit from undoing the slide
+      ptApi('fit', 0, target, window.innerWidth, window.innerHeight, true);
+      setTimeout(() => setCollapsedClass(true), 200);
+    } else {
+      setCollapsedClass(false);
+      ptApi('fit', 0, measure(), window.innerWidth, window.innerHeight, true);
+    }
+  };
+  // a fade when the view changes (campaign -> mapping)
+  window.ptViewCheck = function () {
+    const b = document.querySelector('.m-body');
+    if (!b) return;
+    if (window.ptView && window.ptView !== b.dataset.view) {
+      b.classList.remove('m-fade'); void b.offsetWidth; b.classList.add('m-fade');
+    }
+    window.ptView = b.dataset.view;
   };
   window.ptToggleLock = function () { ptApi('set_lock', !(window.ptLocked !== false)); };
   // locked: it stays where it is (no dragging), buttons still work
@@ -123,10 +155,11 @@ TICK_JS = """
   window.ptFit = function () {
     clearTimeout(fitT);
     fitT = setTimeout(() => {
+      if ((window.ptAnimating || 0) > Date.now()) { window.ptFit(); return; }
       const m = document.querySelector('.mini');
       if (!m) return;
       const need = Math.ceil(m.getBoundingClientRect().bottom);
-      if (Math.abs(need - window.innerHeight) > 2) ptApi('fit', 0, need, window.innerWidth, window.innerHeight);
+      if (Math.abs(need - window.innerHeight) > 2) ptApi('fit', 0, need, window.innerWidth, window.innerHeight, true);
     }, 60);
   };
   window.addEventListener('resize', () => window.ptFit());
@@ -235,31 +268,39 @@ def render(d: dict, live: bool) -> str:
                 + '</div>'
                 + (f'<div class="m-hide"><div class="m-h">NEXT</div>{nxt}</div>' if nxt else ""))
     m = d.get("mapping") or {}
-    nxt = "".join(f'<div class="m-next"><span class="k" style="width:auto;margin-right:6px">'
-                  f'{_esc(x["group"].replace(" Voidstone", ""))}</span>{_esc(x["name"])}</div>' for x in m.get("next", []))
-    phase = "Mapping" if d.get("phase") == "mapping" else "Endgame"
-    top = m.get("top_tier") or 0
+    top = min(m.get("top_tier") or 0, 16)
     on = live and bool(m.get("anchor_utc")) and not m.get("afk")
     clock = _ticker(m.get("mapping_s") or 0, m.get("anchor_utc"), on) if m.get("mapping_s") is not None else "–"
     states = m.get("bar") or ["pending"] * 16
-    cur = next((i for i, st in enumerate(states) if st == "current"), None)
+    # every tier reached is gold; the tier you're on (until T16) is highlighted
+    cur = None if top >= 16 else next((i for i, st in enumerate(states) if st == "current"), None)
     bar = _bar([str(i) for i in range(1, 17)], [0.0 if st == "pending" else 1.0 for st in states], cur)
-    stones = "".join(f'<span title="{_esc(x["name"])} Voidstone" style="color:{"var(--ex-gold)" if x["done"] else "var(--ex-dim)"}">'
-                     f'{"☑" if x["done"] else "☐"} {_esc(x["name"][:4])}</span>' for x in m.get("stones", []))
-    tier = f'<span class="pct">{fmt.tier(min(top, 16)) if top else "–"}</span>'
+    tier = f'<span class="pct">{fmt.tier(top) if top else "–"}</span>'
+    if m.get("ended"):
+        why = "4th Voidstone" if m.get("end_reason") == "voidstones" else "14 days"
+        where = f'<span title="{fmt.when(m["ended"])}">League start ended {fmt.when(m["ended"]).split(",")[0]} · {why}</span>'
+    else:
+        where = f'Mapping · {_esc(m.get("zone") or "")}{tier}'
 
-    def rate(v):
-        return "–" if v is None else fmt.num(v, 1)
+    def t(v):
+        return fmt.clock(v) if v is not None else "–"
+    stones = ""
+    for st in m.get("stones", []):
+        stones += (f'<div class="m-stone{" ok" if st["done"] else ""}"><span class="a">{"☑" if st["done"] else "☐"} '
+                   f'{_esc(st["name"])}</span><span class="t">{t(st["t"]) if st["done"] else ""}</span></div>')
+        for x in st["steps"]:
+            mark = ("✓?" if x.get("likely") else "✓") if x["done"] else "○"
+            stones += (f'<div class="m-step{"" if x["done"] else " todo"}"><span class="k">{mark}</span>'
+                       f'<span class="n">{_esc(x["name"])}</span><span class="t">{t(x["t"])}</span></div>')
     return (f'<div class="m-top"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span>'
             f'<span class="ch">{_esc(d["league"])}</span></div>'
             f'<div class="m-clock">{clock}</div>'
-            + (f'<div class="m-where">League start finished {fmt.when(m["ended"])}{tier}</div>' if m.get("ended") else
-               f'<div class="m-where">{phase} · {_esc(m.get("zone") or "")}{tier}</div>') +
-            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span><span>/h <b>{rate(m.get("maps_per_h"))}</b></span>'
+            f'<div class="m-where">{where}</div>'
+            f'<div class="m-row"><span>Maps <b>{m.get("maps", 0)}</b></span>'
             f'<span>Lv <b>{m.get("level") or "–"}</b></span><span>Deaths <b>{m.get("deaths", 0)}</b></span></div>'
-            + bar +
-            f'<div class="m-row m-hide" style="margin-top:7px">{stones}</div>'
-            + (f'<div class="m-hide"><div class="m-h">NEXT UP</div>{nxt}</div>' if nxt and not m.get("ended") else ""))
+            + bar
+            + (f'<div class="m-hide"><div class="m-h">VOIDSTONES · {m.get("voidstones", 0)}/{m.get("voidstones_total", 4)}</div>'
+               f'{stones}</div>' if stones else ""))
 
 
 @ui.page("/mini")
@@ -296,8 +337,9 @@ def mini_page():
         j = json.dumps([html])
         if j != last["json"]:
             last["json"] = j
-            box.set_content(BUTTONS + f'<div class="m-body">{html}</div>' + foot)
+            view = (data or {}).get("view") or "none"
+            box.set_content(BUTTONS + f'<div class="m-body" data-view="{view}">{html}</div>' + foot)
             ui.run_javascript("window.ptMiniTick && ptMiniTick(); window.ptSetLocked && ptSetLocked(window.ptLocked !== false);"
-                              " window.ptSetCollapsed && ptSetCollapsed(!!window.ptCollapsed)")
+                              " window.ptSetCollapsed && ptSetCollapsed(!!window.ptCollapsed); window.ptViewCheck && ptViewCheck()")
     refresh()
     ui.timer(3, refresh)

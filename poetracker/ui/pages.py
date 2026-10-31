@@ -924,7 +924,8 @@ def _mapping_progress(lg: str, m: dict) -> None:
                 grow, fill, bg = min(max(((b["time_s"] or 0) / ref) ** 0.5, 0.7), 3.0), 1.0, "var(--lg, #d9a441)"
                 sub, tip = fmt.dur(b["time_s"], True) if b["time_s"] else "–", f"T{n}: {fmt.clock(b['time_s'] or 0)} before the next tier"
             elif st == "current":
-                grow, fill, bg = min(max(((b["time_s"] or 0) / ref) ** 0.5, 1.0), 2.0) if done_t else 1.0, 1.0, "var(--lg-cur, #4fb3a5)"
+                grow, fill = min(max(((b["time_s"] or 0) / ref) ** 0.5, 1.0), 2.0) if done_t else 1.0, 1.0
+                bg = "var(--lg, #d9a441)" if n >= 16 else "var(--lg-cur, #4fb3a5)"     # T16 reached: the climb is done
                 sub, tip = fmt.dur(b["time_s"], True), f"T{n}: your highest tier, {fmt.clock(b['time_s'] or 0)} so far"
             elif st == "skipped":
                 grow, fill, bg = 0.6, 1.0, "#5a4c3c"
@@ -946,7 +947,7 @@ def _mapping_progress(lg: str, m: dict) -> None:
         ui.html(f'<div style="display:flex;gap:3px;width:100%;margin-bottom:6px">{segs}</div>').classes("w-full")
         note("One block per tier. Tiers you haven't reached share the bar equally; each tier you've moved past takes "
              "more width the longer you spent there before reaching the next one (hover for the exact time). The "
-             "highest tier you've reached is highlighted; skipped tiers are the thin dark blocks. The clock is play time since your first map, AFK left out.")
+             "tier you're on is highlighted until you reach T16; skipped tiers are the thin dark blocks. The clock is play time since your first map, AFK left out.")
 
     # ---- voidstones: tick boxes that open each one's requirements
     vs = (m.get("voidstones") or {}).get("voidstones") or []
