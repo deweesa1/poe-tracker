@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+from contextlib import contextmanager
 import json
 
 from nicegui import ui
@@ -1576,7 +1577,7 @@ def settings_page():
     from .. import paths
     s = STATE.cfg.settings
     with body:
-        with card("General"):
+        with _section("General", "o_settings", True):
             log_in = ui.input("Client.txt path (empty = find it automatically)", value=s.get("log_path") or "").props(
                 "outlined dense dark").classes("w-full")
             with ui.row().classes("w-full gap-3 items-center"):
@@ -1611,7 +1612,7 @@ def settings_page():
                 if not _upd.installed_copy():      # the installer already makes Start menu / desktop shortcuts
                     ui.button("Create desktop shortcut", icon="add_to_home_screen", on_click=shortcut).props("flat").tooltip(
                         "A PoE Tracker shortcut with its own icon on your desktop (you can pin it to the taskbar)")
-        with card("Mini Tracker"):
+        with _section("Mini Tracker", "picture_in_picture_alt"):
             ui.label("A small always-on-top window with your live timer and progress. Play in windowed or borderless "
                      "fullscreen so it can sit over the game.").classes("pt-sub")
             from .. import mini as mini_mod
@@ -1693,7 +1694,7 @@ document.addEventListener('keydown', onKey, true);
                 ui.button("Open mini tracker", icon="picture_in_picture_alt", on_click=open_mini).props("unelevated")
                 ui.button("Save", on_click=save_mini).props("outline")
                 ui.button("Reset position", on_click=reset_pos).props("flat")
-        with card("League Start"):
+        with _section("League Start", "o_flag"):
             ls = league_start()
             phase = ls.get("real_phase") or ls.get("phase")
             days = int(STATE.cfg.settings.get("league_start_days", 14) or 14)
@@ -1774,7 +1775,7 @@ document.addEventListener('keydown', onKey, true);
             ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
                 "pt-note q-mt-sm")
         _profile_settings_card()
-        with card("Updates"):
+        with _section("Updates", "o_system_update"):
             from nicegui import run as ng_run
             upd = STATE.updater
             box = ui.column().classes("w-full gap-1")
@@ -1851,8 +1852,8 @@ document.addEventListener('keydown', onKey, true);
                      "(Settings → Developer settings → Fine-grained tokens) with read-only Contents access to that one "
                      "repository, and paste it here. It stays on this PC.")
         from .layout import dev_mode as _dev
-        with ui.expansion("Advanced", icon="tune", value=_dev()).classes("w-full pt-card").props("dense header-class=text-weight-bold"):
-            with ui.column().classes("w-full gap-4 q-pt-sm"):
+        with _section("Advanced", "tune", _dev()):
+            with ui.column().classes("w-full gap-4"):
                 with card("Status"):
                     st = STATE.tracker.status() if STATE.tracker else {}
                     for k, v in [
@@ -1904,38 +1905,68 @@ document.addEventListener('keydown', onKey, true);
                         note("Pick a league to force; Phase then sets which pages are open and which view the mini tracker "
                              "shows. The pages keep working out their own numbers, so a finished league still shows where its "
                              "league start ended. Set League back to Automatic to stop forcing.")
-        with card("About"):
+        with _section("About", "o_info"):
             ui.label("PoE Tracker is a free, fan-made tool. It isn't affiliated with or endorsed by Grinding Gear Games.")
             note("Path of Exile and its art are © Grinding Gear Games. The Atlas tree is drawn from GGG's official "
                  "atlastree-export (downloaded the first time you open it, not shipped with the app); its node ids are "
                  "linked with RePoE, a community export of the game data. Everything the tracker records stays on this PC.")
 
 
+@contextmanager
+def _section(title: str, icon: str, default_open: bool = False):
+    """A Settings section that folds away; whether it's open is remembered."""
+    opened = STATE.pref("settings_open") or {}
+
+    def toggle(e):
+        o = dict(STATE.pref("settings_open") or {})
+        o[title] = bool(e.value)
+        STATE.set_pref("settings_open", o)
+    with ui.expansion(title, icon=icon, value=opened.get(title, default_open), on_value_change=toggle).classes(
+            "w-full pt-card pt-set").props("dense header-class=text-weight-bold"):
+        with ui.column().classes("w-full gap-2 pt-set-body"):
+            yield
+
+
 def _profile_settings_card() -> None:
     from .. import profile
     st = STATE.cfg.settings
-    with card("Profile Snapshots"):
+    with _section("Profile Snapshots", "o_photo_camera"):
         ui.label("Saves your character's gear, jewels and passive tree from your public pathofexile.com profile. "
                  "During league start it happens on its own: at the end of each act, then while mapping every 10 "
                  "levels, your first yellow and red map, and each Voidstone. After league start, use Snapshot now "
                  "on the Characters page.").classes("pt-sub")
         with ui.row().classes("items-center gap-4 q-mt-sm w-full"):
-            acct = ui.input("Account name", value=st.get("poe_account") or "", placeholder="Name#1234").props(
-                "outlined dense dark").style("min-width:240px")
+            cur_name, _, cur_tag = str(st.get("poe_account") or "").partition("#")
+            with ui.row().classes("items-center no-wrap gap-1"):
+                acct = ui.input("Account name", value=cur_name, placeholder="Name").props(
+                    "outlined dense dark").style("width:220px")
+                ui.label("#").style("font-size:20px;color:var(--ex-muted, #a69b8c);padding:0 2px")
+                tag = ui.input("Number", value=cur_tag, placeholder="1234").props(
+                    'outlined dense dark maxlength=4 inputmode=numeric').style("width:92px")
+
+            def full() -> str:
+                n, t = (acct.value or "").strip().lstrip("@"), "".join(ch for ch in (tag.value or "") if ch.isdigit())
+                if "#" in n:                       # pasted the whole thing into the name box
+                    n, _, t2 = n.partition("#")
+                    t = t or "".join(ch for ch in t2 if ch.isdigit())
+                    acct.set_value(n)
+                    tag.set_value(t)
+                return f"{n}#{t}" if n and t else n
             auto = ui.switch("Snapshots during league start", value=bool(st.get("profile_snapshots", True)))
             result = ui.label("").classes("pt-note")
 
             def save():
-                v = (acct.value or "").strip()
+                v = full()
                 config_mod.save_settings({"poe_account": v, "profile_snapshots": bool(auto.value)})
                 st["poe_account"], st["profile_snapshots"] = v, bool(auto.value)
                 ui.notify("Saved", position="top", timeout=1500)
 
             async def check():
                 from nicegui import run
-                v = (acct.value or "").strip()
+                v = full()
                 if "#" not in v:
-                    result.set_text("Use the full account name with its #1234 (top right of pathofexile.com when signed in).")
+                    result.set_text("Add the 4-digit number after the # (shown next to your name at the top right of "
+                                    "pathofexile.com when signed in).")
                     return
                 save()
                 result.set_text("Checking…")

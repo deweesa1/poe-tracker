@@ -243,6 +243,12 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-ls-strip .nx .v { color: var(--ex-gold-hi); }
 .pt-ls-strip .bar { flex-basis: 100%; height: 5px; margin-top: 2px; background: #2d2722; border-radius: 3px; overflow: hidden; }
 .pt-ls-strip .bar i { display: block; height: 100%; background: var(--ex-gold); }
+/* settings: folding sections */
+.pt-set > .q-expansion-item__container > .q-item { min-height: 54px; padding: 6px 18px; }
+.pt-set > .q-expansion-item__container > .q-item .q-item__label { font-family: 'Cinzel', serif; font-size: 15px;
+  letter-spacing: .06em; color: var(--ex-gold-hi); }
+.pt-set > .q-expansion-item__container > .q-item .q-icon { color: var(--ex-gold); }
+.pt-set-body { padding: 4px 18px 18px; }
 /* profile snapshots */
 .pt-gear { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-top: 10px; }
 .pt-item { background: rgba(0,0,0,.25); border: 1px solid var(--ex-line); border-radius: 3px; padding: 8px 10px; min-width: 0; cursor: help; }
