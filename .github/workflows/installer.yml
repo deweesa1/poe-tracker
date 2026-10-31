@@ -1,15 +1,20 @@
 name: Build installer
 
-# Push a tag like v0.2.0 to build PoE-Tracker-Setup.exe and publish it as a
-# GitHub release. "Run workflow" on the Actions tab builds one without releasing.
+# Builds PoE-Tracker-Setup.exe. Publishes it as a GitHub release when a tag like
+# v0.2.0 is pushed, or when "Run workflow" (Actions tab) is used with "publish"
+# ticked (that creates the tag too).
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version number for the installer"
+        description: "Version number for the installer (e.g. 0.2.0)"
         default: "0.0.0-test"
+      publish:
+        description: "Publish it as release v<version>"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,11 +43,12 @@ jobs:
           name: PoE-Tracker-Setup
           path: dist/*.exe
       - name: Publish release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || inputs.publish
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" dist/PoE-Tracker-Setup.exe `
-            --title "PoE Tracker ${{ github.ref_name }}" `
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "v${{ inputs.version }}" }
+          gh release create $tag dist/PoE-Tracker-Setup.exe --target "${{ github.sha }}" `
+            --title "PoE Tracker $tag" `
             --notes "Download **PoE-Tracker-Setup.exe** below and run it. Installs for your user only (no admin needed); your data in %LOCALAPPDATA%\PoETracker is kept. After this, the tracker updates itself."
