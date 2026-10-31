@@ -106,9 +106,7 @@ def section(character: str, league: str | None) -> None:
                           on_change=lambda e: (STATE.set_pref(pref_key, e.value), body.refresh())).props(
                     "outlined dense dark options-dense").style("min-width:340px")
             if not in_ls:
-                busy = bool(sn and sn.state.get("busy") == character)
-                b = ui.button("Snapshot now", icon="o_photo_camera", on_click=lambda: snap_now()).props(
-                    "outline no-caps" + (" loading" if busy else ""))
+                b = ui.button("Snapshot now", icon="o_photo_camera", on_click=lambda: snap_now()).props("outline no-caps")
                 if not acct:
                     b.disable()
                     b.tooltip("Add your account name in Settings → Profile Snapshots first")
@@ -130,29 +128,36 @@ def section(character: str, league: str | None) -> None:
             con.close()
         _show(snap, prev)
 
+    watch = {"since": None}
+
     def snap_now():
         if not sn:
             return
+        watch["since"] = sn.state.get("done", 0)
         sn.request(character, league)
-        ui.notify("Reading your profile…", position="top", timeout=2000)
-        body.refresh()
-        t = {"n": 0}
+        status.set_text("Reading your profile on pathofexile.com…")
 
-        def poll():
-            t["n"] += 1
-            if sn.state.get("busy") != character and t["n"] > 2 or t["n"] > 60:
-                tm.deactivate()
-                last = sn.state.get("last") or {}
-                if last.get("status") == "error":
-                    ui.notify(last.get("error"), type="warning", position="top", timeout=6000)
-                elif last.get("status") == "same":
-                    ui.notify("Nothing changed since the last snapshot.", position="top", timeout=3000)
-                STATE.set_pref(pref_key, None)
-                body.refresh()
-        tm = ui.timer(1.0, poll)
+    def check():                       # lives outside body() so refreshing it can't stop it
+        if watch["since"] is None or not sn:
+            return
+        if sn.state.get("done", 0) == watch["since"]:
+            return
+        watch["since"] = None
+        status.set_text("")
+        last = sn.state.get("last") or {}
+        if last.get("status") == "error":
+            ui.notify(last.get("error"), type="warning", position="top", timeout=8000, multi_line=True)
+        elif last.get("status") == "same":
+            ui.notify("Nothing changed since the last snapshot.", position="top", timeout=3000)
+        else:
+            ui.notify("Snapshot saved.", type="positive", position="top", timeout=2500)
+        STATE.set_pref(pref_key, None)
+        body.refresh()
 
     with card("Profile Snapshots"):
+        status = ui.label("").classes("pt-note").style("color:var(--ex-gold-hi, #e6c27a)")
         body()
+        ui.timer(1.0, check)
         note("From your public pathofexile.com profile. During league start they're taken at the end of each act, "
              "then every 10 levels, your first yellow and red map, and each Voidstone. Hover an item for its mods.")
 

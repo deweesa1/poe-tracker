@@ -150,6 +150,7 @@ def link_pending(con: sqlite3.Connection, config: Config) -> int:
     minutes = int(config.settings.get("capture_link_minutes", 10))
     first = con.execute("SELECT MIN(ts_utc) FROM map_capture WHERE run_id IS NULL").fetchone()[0]
     if not first:
+        con.commit()      # relink_all's UPDATE may have opened a write; never leave the database locked
         return 0
     linked = 0
     runs = con.execute(

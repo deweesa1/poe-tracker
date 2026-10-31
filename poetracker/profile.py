@@ -79,18 +79,33 @@ def _get(endpoint: str, params: dict) -> dict:
     with _net:
         pause = _wait_until["t"] - time.time()
         if pause > 0:
-            time.sleep(min(pause, 900))
+            time.sleep(min(pause, 60))
         url = BASE + endpoint + "?" + urllib.parse.urlencode(params)
         req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 _respect_limits(r.headers)
-                data = json.loads(r.read().decode("utf-8"))
+                raw = r.read().decode("utf-8", "replace")
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                log.warning("pathofexile.com sent something that isn't JSON for %s: %s", endpoint, raw[:300].replace("\n", " "))
+                raise ProfileError("pathofexile.com answered with a web page instead of data (its bot protection, "
+                                   "or the site is down). Try again in a few minutes.")
         except urllib.error.HTTPError as e:
             _respect_limits(e.headers)
             if e.code == 429:
                 _wait_until["t"] = time.time() + float(e.headers.get("Retry-After") or 60)
                 raise ProfileError("pathofexile.com asked to slow down; it will try again in a minute") from e
+            body = ""
+            try:
+                body = e.read(2000).decode("utf-8", "replace")
+            except Exception:
+                pass
+            log.warning("pathofexile.com %s on %s: %s", e.code, endpoint, body[:300].replace("\n", " "))
+            if e.code == 403 and "<html" in body.lower():
+                raise ProfileError("pathofexile.com turned the request away (its bot protection). Try again in a "
+                                   "few minutes; if it keeps happening, tell me the message in poetracker.log.") from e
             if e.code == 403:
                 raise ProfileError("The profile is private. On pathofexile.com: My Account → Privacy Settings, "
                                    "untick \"Hide characters\" (the Characters tab must be public).") from e
@@ -99,6 +114,8 @@ def _get(endpoint: str, params: dict) -> dict:
             raise ProfileError(f"pathofexile.com answered {e.code}") from e
         except urllib.error.URLError as e:
             raise ProfileError("Couldn't reach pathofexile.com (offline?)") from e
+        except OSError as e:                         # timed out, connection reset...
+            raise ProfileError(f"pathofexile.com didn't answer in time ({type(e).__name__}). Try again shortly.") from e
     if isinstance(data, dict) and data.get("error"):
         msg = (data["error"] or {}).get("message") or "unknown error"
         raise ProfileError(f"pathofexile.com: {msg}")
@@ -190,7 +207,7 @@ class Snapshotter:
 
     def __init__(self, cfg):
         self.cfg = cfg
-        self.state: dict = {"busy": None, "last": None, "error": None}
+        self.state: dict = {"busy": None, "last": None, "error": None, "done": 0}
         self._manual: list[tuple[str, str | None]] = []
         self._kick = threading.Event()
         self._seen: set = set()
@@ -220,17 +237,30 @@ class Snapshotter:
             self._kick.wait(POLL_S)
             self._kick.clear()
 
+    def _run(self, con, character, league, key, label, event_utc) -> None:
+        self.state["busy"] = character
+        try:
+            res = take(con, self.account, character, league, key, label, event_utc)
+        except Exception as e:                      # never leave the page waiting
+            log.exception("profile snapshot failed")
+            res = {"character_name": character, "trigger": key, "status": "error", "error": f"Snapshot failed: {e}"}
+        log.info("profile snapshot %s %s: %s %s", character, key, res.get("status"), res.get("error") or "")
+        self.state["last"] = res
+        self.state["busy"] = None
+        self.state["done"] = self.state.get("done", 0) + 1
+
     def _tick(self) -> None:
         if not self.account:
-            self._manual.clear()
+            if self._manual:
+                self._manual.clear()
+                self.state["last"] = {"status": "error", "error": "Add your account name in Settings → Profile Snapshots."}
+                self.state["done"] = self.state.get("done", 0) + 1
             return
         con = db.connect(paths.db_path())
         try:
             while self._manual:
                 ch, lg = self._manual.pop(0)
-                self.state["busy"] = ch
-                self.state["last"] = take(con, self.account, ch, lg, "manual", "Snapshot by you")
-                self.state["busy"] = None
+                self._run(con, ch, lg, "manual", "Snapshot by you", None)
             if not self.auto:
                 return
             league = metrics.current_league(self.cfg)
@@ -253,9 +283,7 @@ class Snapshotter:
                 self._seen.add(k)
                 if age < DELAY_S:
                     continue                      # give the game a moment to save the character
-                self.state["busy"] = t["character"]
-                self.state["last"] = take(con, self.account, t["character"], league, t["key"], t["label"], t["event_utc"])
-                self.state["busy"] = None
+                self._run(con, t["character"], league, t["key"], t["label"], t["event_utc"])
         finally:
             self.state["busy"] = None
             con.close()
