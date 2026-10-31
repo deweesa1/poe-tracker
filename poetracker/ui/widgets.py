@@ -64,7 +64,6 @@ html {{ scroll-behavior: smooth; }}
   color: var(--ex-gold, #d9a441); margin-bottom: 2px; }}
 .pt-drawer-foot {{ border-top: 1px solid var(--ex-line-dim, #2d2722); }}
 .pt-sep {{ align-self: stretch; height: 1px; margin: 6px 14px; background: var(--ex-line-dim, #2d2722); }}
-.q-drawer--mini .pt-sep {{ margin: 6px 10px; }}
 .q-drawer, .q-drawer__content {{ overflow: visible !important; }}
 .pt-toggle {{ position: absolute; right: -14px; top: -100px; width: 26px; height: 26px;
   border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5;
@@ -74,11 +73,23 @@ html {{ scroll-behavior: smooth; }}
 .pt-logo {{ padding-left: 16px; padding-right: 16px; }}
 body:not(.pt-mini) .pt-nav-tip {{ display: none !important; }}
 .q-drawer--mini .q-mini-drawer-hide {{ display: none !important; }}
-.q-drawer--mini .pt-logo {{ padding: 24px 0 16px !important; justify-content: center; width: 100%; }}
-.q-drawer--mini .pt-nav .q-item {{ justify-content: center; padding-left: 0 !important; padding-right: 0 !important; margin: 1px 8px; width: calc(100% - 16px); }}
-.q-drawer--mini .pt-nav .q-item__section--avatar {{ min-width: 0 !important; padding-right: 0 !important; }}
-.q-drawer--mini .pt-ver {{ margin: 6px 10px 0; padding: 10px 0 8px; display: flex; justify-content: center; }}
+/* collapsed menu: 40px squares centred in the strip; the active one is tinted
+   and marked by a bar on the menu's left edge */
+.q-drawer--mini .pt-logo {{ padding: 22px 0 14px !important; justify-content: center; width: 100%; }}
+.q-drawer--mini .pt-logo img {{ width: 26px !important; height: 26px !important; }}
+.q-drawer--mini .pt-nav {{ display: flex; flex-direction: column; align-items: center; }}
+.q-drawer--mini .pt-nav .q-item {{ width: 40px !important; min-height: 40px !important; height: 40px; margin: 3px 0 !important;
+  padding: 0 !important; justify-content: center; border-left: 0 !important; border-radius: 8px !important;
+  position: relative; overflow: visible !important; }}
+.q-drawer--mini .pt-nav .q-item.active {{ background: rgba(201,163,90,.18) !important; }}
+.q-drawer--mini .pt-nav .q-item.active::before {{ content: ""; position: absolute; left: -8px; top: 9px; bottom: 9px;
+  width: 3px; border-radius: 0 2px 2px 0; background: var(--ex-gold, #c9a35a); }}
+.q-drawer--mini .pt-nav .q-item__section--avatar {{ min-width: 0 !important; padding: 0 !important; justify-content: center; }}
+.q-drawer--mini .pt-nav .q-icon {{ font-size: 19px !important; }}
+.q-drawer--mini .pt-sep {{ width: 24px; margin: 6px auto; align-self: center; }}
+.q-drawer--mini .pt-ver {{ margin: 6px auto 0; padding: 10px 0 8px; width: 24px; display: flex; justify-content: center; }}
 .q-drawer--mini .pt-ver > .nicegui-row {{ width: auto !important; justify-content: center; }}
+
 
 .pt-stat {{ display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
   border-radius: 50%; border: 1px solid var(--ex-line-dim, #2d2722); background: rgba(0,0,0,.18); cursor: default; }}

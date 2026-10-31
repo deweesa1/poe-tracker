@@ -236,7 +236,7 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
 
     mini = bool(STATE.pref("drawer_mini", False))
     drawer = ui.left_drawer(value=True, fixed=True).props(
-        f"width=252 mini-width=64 bordered breakpoint=700{' mini' if mini else ''}").classes("q-pa-none column no-wrap")
+        f"width=252 mini-width=56 bordered breakpoint=700{' mini' if mini else ''}").classes("q-pa-none column no-wrap")
     ui.query("body").classes(add="pt-mini" if mini else "", remove="" if mini else "pt-mini")
 
     def toggle_mini():
