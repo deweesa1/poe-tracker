@@ -96,3 +96,5 @@ See the disclaimer at the top (also in `DISCLAIMER.txt`). The Atlas Tree page dr
 [atlastree-export](https://github.com/grindinggear/atlastree-export), downloaded on first use into the data folder
 (nothing of it is shipped with the app); passive names come from GGG's
 [skilltree-export](https://github.com/grindinggear/skilltree-export) the same way. Atlas node ids are linked with [RePoE](https://github.com/repoe-fork/repoe).
+Item influence, fractured and synthesised symbols are downloaded on first use from
+[Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding)'s assets (the art is Grinding Gear Games').
