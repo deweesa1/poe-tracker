@@ -4,20 +4,27 @@ A personal Path of Exile tracker that runs on your PC. It reads the game's `Clie
 
 It never touches the game. It only reads the log file and, if you turn it on, the clipboard.
 
-## Start it
+## Install
 
-1. Double-click **`Start PoE Tracker.bat`**.
-   - The first run creates a Python environment in `.venv` and installs the packages in `requirements.txt` (`pyyaml`, `tzdata`, `nicegui`, `pywebview`). It needs internet and takes a minute or two.
-   - Your whole log is then read once (about 15 seconds for 200 MB).
-2. The dashboard opens in **its own window**. Closing the window stops the tracker.
+1. Download **PoE-Tracker-Setup.exe** from the [latest release](https://github.com/deweesa1/poe-tracker/releases/latest) and run it.
+   Windows SmartScreen warns the first time (the installer isn't code-signed): click *More info → Run anyway*.
+2. It installs for your user only (no admin prompt) into `%LOCALAPPDATA%\Programs\PoE Tracker`, with its own copy of Python, and adds **PoE Tracker** to the Start menu (and the desktop if you tick it). Pin it to the taskbar like any app.
+3. The tracker updates itself: when *Update ready* appears at the bottom of the side menu, click it. Only the files that changed are downloaded.
 
-If something goes wrong, use **`Start PoE Tracker (with log window).bat`** to see the messages.
+Uninstall from Windows Settings → Apps. Your data in `%LOCALAPPDATA%\PoETracker` is kept.
 
-**Developer mode:** **`Start PoE Tracker (dev).bat`** adds a *Developer* card to Settings that forces League Start to any league and phase (campaign, mapping, finished), for testing the League Start pages, menu locking and mini tracker. Your data isn't changed.
+The Start menu also has **PoE Tracker (with log window)**, which shows the app's messages, and **PoE Tracker (dev)** (developer mode: Settings gets a *Developer* card that forces League Start to any league and phase).
 
-### Make an .exe
+## Run from source (development)
 
-Double-click **`Build exe.bat`** (after the first start). It creates `dist\PoE Tracker\PoE Tracker.exe`. You can move that folder anywhere and pin the exe to the taskbar. The exe isn't digitally signed, so Windows SmartScreen will warn the first time: click *More info → Run anyway*.
+1. Double-click **`Start PoE Tracker.bat`**. The first run creates a Python environment in `.venv` and installs `requirements.txt` (needs Python 3.13+ and internet).
+2. `tools\` has the other ways in: with a log window, developer mode, running the tests, and updating a source copy from GitHub (needs Git).
+
+A source copy is a git clone and updates with git; an installed copy updates file by file from GitHub (like Path of Building), no Git needed.
+
+### Build the installer
+
+GitHub builds it: push a tag like `v0.2.0` and the *Build installer* workflow publishes `PoE-Tracker-Setup.exe` as a release. To build it on your own PC: Python 3.13 and Inno Setup 6, then `pwsh installer\build.ps1 -Version 0.2.0`.
 
 ### From a terminal
 

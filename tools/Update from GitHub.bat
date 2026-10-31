@@ -2,7 +2,7 @@
 rem Gets the latest PoE Tracker from GitHub (github.com/deweesa1/poe-tracker).
 rem Your data (database, settings, Client.txt) lives elsewhere and isn't touched.
 rem Needs Git for Windows: https://git-scm.com/download/win
-cd /d "%~dp0"
+cd /d "%~dp0.."
 where git >nul 2>nul || (echo Git isn't installed. Get it from https://git-scm.com/download/win & pause & exit /b 1)
 if not exist ".git" (
   echo First time: connecting this folder to GitHub...

@@ -1,13 +1,22 @@
-"""Updates from GitHub: the tracker checks the project's git repository in the
-background and can pull the new version and restart itself.
+"""Updates from GitHub: the tracker checks github.com/deweesa1/poe-tracker in the
+background and can update itself and restart.
 
-Works when the project folder is a git clone (Update PoE Tracker.bat or the
-Settings page sets that up) and Git for Windows is installed. Your data lives
+Two ways, picked automatically:
+- Installed copy (PoE Tracker Setup.exe; the app folder has version.json): like
+  Path of Building, it asks GitHub which files the newest version has (with each
+  file's fingerprint), downloads only the ones that differ from yours, checks
+  them and swaps them in. No Git needed.
+- Developer copy (a git clone, e.g. in C:/dev/poe-tracker): git fetch / pull, which
+  needs Git for Windows. Your data lives
 in the data folder, not here, so updating never touches it.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +34,45 @@ BRANCH = "main"
 _NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0     # don't flash a console window
 
 
+VERSION_FILE = "version.json"          # in an installed copy: {"commit": "<sha>", "date": "..."}
+APP_PARTS = ("poetracker/", "requirements.txt")   # the files an installed copy gets from GitHub
+
+
+def installed_copy() -> bool:
+    return (PROJECT_DIR / VERSION_FILE).exists() and not (PROJECT_DIR / ".git").exists()
+
+
+def _owner_repo(url: str) -> str:
+    m = re.search(r"github\.com[/:]([^/]+)/([^/.]+)", url or "")
+    return f"{m.group(1)}/{m.group(2)}" if m else "deweesa1/poe-tracker"
+
+
+def _http(url: str, timeout: float = 30, raw: bool = False):
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "poe-tracker-updater",
+                                               "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = r.read()
+    return data if raw else json.loads(data.decode("utf-8"))
+
+
+def blob_sha(data: bytes) -> str:
+    """Git's fingerprint of a file's contents (what GitHub lists for every file)."""
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def _local_files() -> dict[str, Path]:
+    """The app files in this copy, by their path in the repo."""
+    out = {}
+    req = PROJECT_DIR / "requirements.txt"
+    if req.exists():
+        out["requirements.txt"] = req
+    for f in (PROJECT_DIR / "poetracker").rglob("*"):
+        if f.is_file() and "__pycache__" not in f.parts and f.suffix != ".pyc":
+            out[f.relative_to(PROJECT_DIR).as_posix()] = f
+    return out
+
+
 def _git(*args: str, timeout: float = 60) -> subprocess.CompletedProcess:
     # git writes UTF-8; Windows would otherwise decode it as cp1252 ("Â·")
     return subprocess.run(["git", *args], cwd=PROJECT_DIR, capture_output=True, text=True, encoding="utf-8",
@@ -34,15 +82,30 @@ def _git(*args: str, timeout: float = 60) -> subprocess.CompletedProcess:
 class Updater:
     def __init__(self, repo_url: str | None = None):
         self.repo_url = repo_url or DEFAULT_REPO
+        self.repo = _owner_repo(self.repo_url)
+        self.installed = installed_copy()
         self.lock = threading.Lock()
         self.state: dict = {"checked": None, "available": False, "behind": 0, "changes": [], "error": None,
-                            "version": None, "connected": False, "git": bool(shutil.which("git")), "busy": False}
+                            "version": None, "connected": False, "busy": False, "installed": self.installed,
+                            "git": self.installed or bool(shutil.which("git")), "needs_installer": False}
+        self._target: str | None = None       # newest commit seen by check()
 
     # -- facts about this folder ------------------------------------------
     def connected(self) -> bool:
-        return self.state["git"] and (PROJECT_DIR / ".git").exists()
+        if self.installed:
+            return True
+        return bool(shutil.which("git")) and (PROJECT_DIR / ".git").exists()
+
+    def _local_version(self) -> dict:
+        try:
+            return json.loads((PROJECT_DIR / VERSION_FILE).read_text(encoding="utf-8-sig"))
+        except Exception:
+            return {}
 
     def version(self) -> str | None:
+        if self.installed:
+            v = self._local_version()
+            return f"{v['commit'][:7]} · {v.get('date', '')}".strip(" ·") if v.get("commit") else None
         if not self.connected():
             return None
         r = _git("log", "-1", "--format=%h|%cd", "--date=format:%b %d, %H:%M")
@@ -51,6 +114,8 @@ class Updater:
 
     # -- check / apply ----------------------------------------------------
     def check(self) -> dict:
+        if self.installed:
+            return self._check_installed()
         with self.lock:
             st = self.state
             st["git"] = bool(shutil.which("git"))
@@ -74,7 +139,9 @@ class Updater:
             return dict(st)
 
     def apply(self) -> tuple[bool, str]:
-        """Pull the new version. Returns (ok, message)."""
+        """Get the new version. Returns (ok, message)."""
+        if self.installed:
+            return self._apply_installed()
         with self.lock:
             self.state["busy"] = True
             try:
@@ -105,14 +172,106 @@ class Updater:
         self.state["version"] = self.version()
         return True, "Connected to GitHub."
 
+    # -- installed copies: fingerprint list from GitHub, changed files only ----
+    def _check_installed(self) -> dict:
+        with self.lock:
+            st = self.state
+            st["version"] = self.version()
+            try:
+                head = _http(f"https://api.github.com/repos/{self.repo}/commits/{BRANCH}")
+                target = head["sha"]
+                local = self._local_version().get("commit")
+                self._target = target
+                if local == target:
+                    st.update(available=False, behind=0, changes=[], error=None)
+                else:
+                    behind, changes = 1, [head["commit"]["message"].splitlines()[0]]
+                    if local:
+                        try:
+                            cmp = _http(f"https://api.github.com/repos/{self.repo}/compare/{local}...{target}")
+                            behind = cmp.get("ahead_by") or behind
+                            changes = [c["commit"]["message"].splitlines()[0] for c in reversed(cmp.get("commits") or [])]
+                        except Exception:
+                            pass
+                    st.update(available=True, behind=behind, changes=changes[:15], error=None)
+            except Exception as e:
+                st.update(error=_short_error(e))
+            st["checked"] = time.time()
+            return dict(st)
+
+    def _apply_installed(self) -> tuple[bool, str]:
+        with self.lock:
+            self.state["busy"] = True
+            try:
+                target = self._target or _http(f"https://api.github.com/repos/{self.repo}/commits/{BRANCH}")["sha"]
+                tree = _http(f"https://api.github.com/repos/{self.repo}/git/trees/{target}?recursive=1", timeout=60)
+                remote = {t["path"]: t["sha"] for t in tree.get("tree", [])
+                          if t.get("type") == "blob" and t["path"].startswith(APP_PARTS)
+                          and "__pycache__" not in t["path"]}
+                if not remote:
+                    return False, "GitHub sent an empty file list; try again later."
+                local = _local_files()
+                hashes = {p: blob_sha(f.read_bytes()) for p, f in local.items()}
+                if remote.get("requirements.txt") and hashes.get("requirements.txt") != remote["requirements.txt"]:
+                    # new Python packages: the installer brings those, a file update can't
+                    self.state["needs_installer"] = True
+                    return False, ("This update needs new Python packages, so it comes as a new installer. Download "
+                                   f"PoE Tracker Setup.exe from https://github.com/{self.repo}/releases/latest and run "
+                                   "it; your data is kept.")
+                todo = [p for p, sha in remote.items() if hashes.get(p) != sha]
+                staged: dict[str, bytes] = {}
+                for p in todo:
+                    from urllib.parse import quote
+                    data = _http(f"https://raw.githubusercontent.com/{self.repo}/{target}/{quote(p)}", timeout=60, raw=True)
+                    if blob_sha(data) != remote[p]:
+                        return False, f"A downloaded file didn't match GitHub's fingerprint ({p}); nothing was changed."
+                    staged[p] = data
+                # everything downloaded and checked: now swap the files in
+                for p, data in staged.items():
+                    dest = PROJECT_DIR / p
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = dest.with_name(dest.name + ".new")
+                    tmp.write_bytes(data)
+                    os.replace(tmp, dest)
+                removed = 0
+                for p, f in local.items():
+                    if p not in remote and p.startswith("poetracker/"):
+                        try:
+                            f.unlink()
+                            removed += 1
+                        except OSError:
+                            pass
+                date = time.strftime("%b %d, %H:%M")
+                try:
+                    c = _http(f"https://api.github.com/repos/{self.repo}/commits/{target}")
+                    from datetime import datetime
+                    date = datetime.fromisoformat(c["commit"]["committer"]["date"].replace("Z", "+00:00")).astimezone().strftime(
+                        "%b %d, %H:%M")
+                except Exception:
+                    pass
+                (PROJECT_DIR / VERSION_FILE).write_text(json.dumps({"commit": target, "date": date}), encoding="utf-8")
+                self.state.update(available=False, behind=0, changes=[], version=self.version())
+                log.info("updated to %s: %d files changed, %d removed", target[:7], len(staged), removed)
+                return True, f"Updated ({len(staged)} file{'s' if len(staged) != 1 else ''})."
+            except Exception as e:
+                log.exception("update failed")
+                return False, f"Update failed: {_short_error(e)}"
+            finally:
+                self.state["busy"] = False
+
     def check_soon(self, older_than: float = 90) -> None:
         """Check in the background if the last check is older than this (seconds)."""
+        if self.installed:
+            older_than = max(older_than, 300)     # GitHub allows 60 questions an hour without an account
         st = self.state
         if st.get("busy") or self.lock.locked() or (st.get("checked") and time.time() - st["checked"] < older_than):
             return
         threading.Thread(target=self.check, daemon=True, name="update-check").start()
 
     def start_background(self, every_minutes: float = 2) -> None:
+        if self.installed:
+            every_minutes = max(every_minutes, 5)
+
         def loop():
             time.sleep(20)               # let the tracker finish starting first
             while True:
@@ -122,6 +281,17 @@ class Updater:
                     log.exception("update check failed")
                 time.sleep(every_minutes * 60)
         threading.Thread(target=loop, daemon=True, name="updates").start()
+
+
+def _short_error(e: Exception) -> str:
+    import urllib.error
+    if isinstance(e, urllib.error.HTTPError):
+        if e.code == 403:
+            return "GitHub says to slow down; it'll check again in a few minutes"
+        return f"GitHub answered {e.code}"
+    if isinstance(e, urllib.error.URLError):
+        return "couldn't reach GitHub (offline?)"
+    return str(e)[:200]
 
 
 def restart_app() -> None:
@@ -168,7 +338,7 @@ def run_restart(args: list[str] | None = None, wait: float = 60.0) -> int:
     service.release_instance()
     # 2. new packages, quietly (needs internet; a failure isn't fatal)
     req = PROJECT_DIR / "requirements.txt"
-    if req.exists():
+    if req.exists() and not installed_copy():
         try:
             r = subprocess.run([_console_python(), "-m", "pip", "install", "-q", "--disable-pip-version-check",
                                 "-r", str(req)], cwd=PROJECT_DIR, capture_output=True, text=True, timeout=600,

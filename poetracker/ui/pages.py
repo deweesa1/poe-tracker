@@ -1800,7 +1800,7 @@ document.addEventListener('keydown', onKey, true);
                     with card("Developer"):
                         ui.label("Force League Start to any league and phase, to test the League Start pages, the menu "
                                  "locking and the mini tracker without waiting for a league launch. Only shown when the "
-                                 "tracker is started with Start PoE Tracker (dev).bat (or dev_mode: true in settings.yaml). "
+                                 "tracker is started with tools\\Start PoE Tracker (dev).bat or the 'PoE Tracker (dev)' Start menu entry (or dev_mode: true in settings.yaml). "
                                  "Your data isn't changed.").classes("pt-sub")
                         d = dict(STATE.pref("dev_league_start") or {})
                         lgs = {"": "Automatic (newest league)", **{n: n for n in STATE.league_names()}}
