@@ -46,6 +46,9 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     if cfg.settings.get("update_check", True):
         STATE.updater.start_background()
     STATE.load_prefs()
+    from .. import profile
+    STATE.snaps = profile.Snapshotter(cfg)
+    STATE.snaps.start()
     app.on_shutdown(tracker.stop.set)
 
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))

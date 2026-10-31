@@ -33,6 +33,7 @@ class State:
         self.cfg: config_mod.Config | None = None
         self.tracker = None
         self.updater = None
+        self.snaps = None          # profile snapshots (profile.Snapshotter)
         self.dev = False
         self._prefs: dict = {}
         self._lock = threading.Lock()

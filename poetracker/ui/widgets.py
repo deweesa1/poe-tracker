@@ -243,6 +243,18 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-ls-strip .nx .v { color: var(--ex-gold-hi); }
 .pt-ls-strip .bar { flex-basis: 100%; height: 5px; margin-top: 2px; background: #2d2722; border-radius: 3px; overflow: hidden; }
 .pt-ls-strip .bar i { display: block; height: 100%; background: var(--ex-gold); }
+/* profile snapshots */
+.pt-gear { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-top: 10px; }
+.pt-item { background: rgba(0,0,0,.25); border: 1px solid var(--ex-line); border-radius: 3px; padding: 8px 10px; min-width: 0; cursor: help; }
+.pt-item .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
+.pt-item .nm { font-size: 13.5px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.pt-item .gm { font-size: 11.5px; color: #4fb3a5; margin-top: 3px; line-height: 1.3; }
+.pt-snapdiff { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--ex-gold); background: rgba(201,163,90,.07);
+  font-size: 13px; line-height: 1.5; color: var(--ex-text); }
+.pt-snapdiff .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-gold); margin-bottom: 2px; }
+.pt-snapdiff b { color: var(--ex-gold-hi); font-weight: 600; }
+.pt-snaplist { font-size: 13px; line-height: 1.45; color: var(--ex-text); }
+.pt-snaplist .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); margin-right: 6px; }
 /* atlas passive tree */
 .pt-atlas { position: relative; height: max(520px, calc(100vh - 300px)); background: #07080b; border: 1px solid var(--ex-line);
   border-radius: 3px; overflow: hidden; touch-action: none; user-select: none; }

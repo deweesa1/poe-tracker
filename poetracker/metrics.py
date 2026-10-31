@@ -1629,3 +1629,54 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
         "next": [{"group": x["group"], "name": x["name"]} for x in nxt],
     }
     return out
+
+
+# ---------------------------------------------------------------- profile snapshots
+
+def snapshot_triggers(con, config: Config, league: str | None = None) -> list[dict]:
+    """League start moments that call for a profile snapshot:
+    campaign - the end of each act (League Start Campaign's character);
+    mapping  - every 10th level, first yellow (T6) and red (T11) map, each
+               Voidstone (League Start Mapping's character).
+    Each: {key, label, character_id, character, event_utc}. Nothing once
+    league start has been over for a while."""
+    st = league_start_status(con, config, league)
+    lg = st["league"]
+    if not lg:
+        return []
+    now = datetime.now(timezone.utc)
+    if st["phase"] == "done":
+        end = st.get("end_utc")
+        if not end or (now - datetime.strptime(end, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)).total_seconds() > 3600:
+            return []
+    names = {r[0]: r[1] for r in con.execute("SELECT id, name FROM character WHERE league_id=(SELECT id FROM league WHERE name=?)",
+                                              (lg,))}
+    out: list[dict] = []
+
+    def add(key, label, cid, ts):
+        if cid and ts and names.get(cid):
+            out.append({"key": key, "label": label, "character_id": cid, "character": names[cid], "event_utc": ts})
+    cid = st.get("starter")
+    if cid:
+        sp = campaign_splits(con, cid)
+        for a in (sp or {}).get("acts") or []:
+            if a.get("finished") and a.get("end_utc"):
+                add(f"act{a['act']}", f"Act {a['act']} finished", cid, a["end_utc"])
+    mc = st.get("mapping_char")
+    if mc and st.get("campaign_end"):
+        runs_ = con.execute("SELECT start_utc, tier FROM run WHERE character_id=? AND kind='map' AND tier IS NOT NULL "
+                            "ORDER BY start_utc", (mc,)).fetchall()
+        for key, label, t in (("t6", "First yellow map (T6)", 6), ("t11", "First red map (T11)", 11)):
+            r = next((r for r in runs_ if r[1] >= t), None)
+            if r:
+                add(key, label, mc, r[0])
+        first_map = runs_[0][0] if runs_ else None
+        if first_map:
+            for lvl, ts in con.execute("SELECT level, MIN(ts_utc) FROM level_up WHERE character_id=? AND level % 10 = 0 "
+                                       "AND ts_utc>=? GROUP BY level ORDER BY level", (mc, first_map)):
+                add(f"level{lvl}", f"Level {lvl}", mc, ts)
+        vs = voidstones(con, config, lg)
+        for s in vs.get("voidstones") or []:
+            if s.get("obtained") and s.get("when"):
+                add(f"voidstone:{s['name']}", s["name"], mc, s["when"])
+    return out

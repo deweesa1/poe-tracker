@@ -47,3 +47,8 @@ mini_on_start: false        # open it whenever the tracker starts
 mini_click_through: false   # true: clicks on the locked mini tracker go to the game underneath
 mini_hotkey: ctrl+alt+m     # lock/unlock; change it in Settings
 mini_opacity: 0.92          # 0.4 (very see-through) to 1.0 (solid)
+
+# Profile snapshots: your account name (Name#1234) for reading gear, jewels and
+# the passive tree from your public pathofexile.com profile.
+poe_account: ""
+profile_snapshots: true     # take them automatically during league start

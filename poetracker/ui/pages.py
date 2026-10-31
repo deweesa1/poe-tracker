@@ -1144,6 +1144,8 @@ def character_page():
             ("Deaths", fmt.num(d["death_count"])),
             ("Passive changes", fmt.num(d["tree"]["change_count"]), f"{d['tree']['count']} points known now"),
         ])
+        from . import snapshots
+        snapshots.section(ch["name"], lg)
         with ui.row().classes("w-full gap-4 items-start pt-wrap"):
             with card("Level by play time", "flex-[3]"):
                 lv = d["levels"]
@@ -1771,6 +1773,7 @@ document.addEventListener('keydown', onKey, true);
             lgs = list(reversed(STATE.cfg.leagues))[:4]
             ui.label("Latest leagues: " + " · ".join(f"{l.name} ({fmt.date(l.start.strftime('%Y-%m-%dT%H:%M:%SZ'))})" for l in lgs)).classes(
                 "pt-note q-mt-sm")
+        _profile_settings_card()
         with card("Updates"):
             from nicegui import run as ng_run
             upd = STATE.updater
@@ -1906,6 +1909,49 @@ document.addEventListener('keydown', onKey, true);
             note("Path of Exile and its art are © Grinding Gear Games. The Atlas tree is drawn from GGG's official "
                  "atlastree-export (downloaded the first time you open it, not shipped with the app); its node ids are "
                  "linked with RePoE, a community export of the game data. Everything the tracker records stays on this PC.")
+
+
+def _profile_settings_card() -> None:
+    from .. import profile
+    st = STATE.cfg.settings
+    with card("Profile Snapshots"):
+        ui.label("Saves your character's gear, jewels and passive tree from your public pathofexile.com profile. "
+                 "During league start it happens on its own: at the end of each act, then while mapping every 10 "
+                 "levels, your first yellow and red map, and each Voidstone. After league start, use Snapshot now "
+                 "on the Characters page.").classes("pt-sub")
+        with ui.row().classes("items-center gap-4 q-mt-sm w-full"):
+            acct = ui.input("Account name", value=st.get("poe_account") or "", placeholder="Name#1234").props(
+                "outlined dense dark").style("min-width:240px")
+            auto = ui.switch("Snapshots during league start", value=bool(st.get("profile_snapshots", True)))
+            result = ui.label("").classes("pt-note")
+
+            def save():
+                v = (acct.value or "").strip()
+                config_mod.save_settings({"poe_account": v, "profile_snapshots": bool(auto.value)})
+                st["poe_account"], st["profile_snapshots"] = v, bool(auto.value)
+                ui.notify("Saved", position="top", timeout=1500)
+
+            async def check():
+                from nicegui import run
+                v = (acct.value or "").strip()
+                if "#" not in v:
+                    result.set_text("Use the full account name with its #1234 (top right of pathofexile.com when signed in).")
+                    return
+                save()
+                result.set_text("Checking…")
+                try:
+                    chars = await run.io_bound(profile.characters, v)
+                    lg = STATE.league()
+                    here = [c for c in chars if c.get("league") == lg]
+                    result.set_text(f"Found {len(chars)} characters ({len(here)} in {lg}). Snapshots will work."
+                                    if chars else "The account answered but lists no characters. Is the Characters tab public?")
+                except profile.ProfileError as e:
+                    result.set_text(str(e))
+            auto.on_value_change(lambda e: save())
+            ui.button("Save and check", icon="o_fact_check", on_click=check).props("outline no-caps")
+        note("Your Characters tab must be public (pathofexile.com → My Account → Privacy Settings). This reads the same "
+             "public profile Path of Building's \"Import by account name\" reads; no login or password is used, and "
+             "snapshots are stored only on this PC.")
 
 
 # ====================================================================== warm-up

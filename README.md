@@ -81,11 +81,17 @@ Code map:
 - **Time:** "played" means time in areas minus AFK periods. Time inside a map counts every portal entry and side area of that map instance; hideout time between portals doesn't count.
 - **Leagues:** a character belongs to the league that was running when it first appeared. Start dates are in `config\leagues.yaml`. Add each new league there when it launches, or pin a character to a league.
 - **Passive and atlas trees:** only points changed while the log was recording are known.
-- **Not possible from the log:** stash contents, gear, gems and links. Those would need GGG's API, which isn't open to new apps.
+- **Not possible from the log:** stash contents, gear, gems and links.
+- **Profile snapshots:** with your account name (Name#1234) in Settings and a public Characters tab, the tracker reads
+  gear, jewels and the passive tree from your pathofexile.com profile (the same public profile Path of Building's
+  "Import by account name" reads). During league start this happens at the end of each act, every 10 levels while
+  mapping, the first yellow and red map, and each Voidstone; afterwards there's a Snapshot now button on the Characters
+  page. One request at a time, following the site's rate limits; no login is used and snapshots stay on your PC.
 
 ## Credits
 
 PoE Tracker is a free, fan-made tool and isn't affiliated with or endorsed by Grinding Gear Games.
 Path of Exile and its art are © Grinding Gear Games. The Atlas Tree page draws the tree from GGG's official
 [atlastree-export](https://github.com/grindinggear/atlastree-export), downloaded on first use into the data folder
-(nothing of it is shipped with the app). Atlas node ids are linked with [RePoE](https://github.com/repoe-fork/repoe).
+(nothing of it is shipped with the app); passive names come from GGG's
+[skilltree-export](https://github.com/grindinggear/skilltree-export) the same way. Atlas node ids are linked with [RePoE](https://github.com/repoe-fork/repoe).
