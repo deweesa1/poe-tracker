@@ -145,6 +145,35 @@ def defences(items: list[dict]) -> dict:
     return out
 
 
+_RES = ("Fire", "Cold", "Lightning", "Chaos")
+
+
+def resistances(items: list[dict]) -> dict:
+    """Fire / cold / lightning / chaos resistance added up from your equipped gear's mods
+    (before the act penalty, the passive tree and other bonuses)."""
+    import re
+    out = dict.fromkeys(_RES, 0)
+    one = re.compile(r"([+-]?\d+)% to (Fire|Cold|Lightning|Chaos) Resistance\b")
+    two = re.compile(r"([+-]?\d+)% to (Fire|Cold|Lightning|Chaos) and (Fire|Cold|Lightning|Chaos) Resistances")
+    alle = re.compile(r"([+-]?\d+)% to all Elemental Resistances")
+    for it in items:
+        if it.get("inventoryId") in ("Weapon2", "Offhand2", "Flask", "Trinket"):
+            continue
+        for key in ("implicitMods", "explicitMods", "craftedMods", "fracturedMods", "enchantMods", "mutatedMods",
+                    "crucibleMods", "runeMods", "desecratedMods"):
+            for m in it.get(key) or []:
+                t = _mod_text(m)
+                if (x := two.search(t)):
+                    out[x.group(2)] += int(x.group(1))
+                    out[x.group(3)] += int(x.group(1))
+                elif (x := alle.search(t)):
+                    for r in ("Fire", "Cold", "Lightning"):
+                        out[r] += int(x.group(1))
+                elif (x := one.search(t)):
+                    out[x.group(2)] += int(x.group(1))
+    return out
+
+
 def _gems(it: dict) -> list[str]:
     out = []
     for g in it.get("socketedItems") or []:
@@ -320,13 +349,17 @@ def _show(snap: dict | None, prev: dict | None) -> None:
         jewels = (snap.get("passives") or {}).get("items") or []
         abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
         with ui.column().classes("gap-3").style("flex:none"):
+            ui.label("Gear").classes("pt-snaphead")
             ui.html(_paperdoll(items), sanitize=False)
-            dv = {k: v for k, v in defences(items).items() if v}
-            if dv:
-                ui.html('<div class="pt-def">' + "".join(
-                    f'<span class="{k.split()[0].lower()}"><small>{esc(k)}</small>{v:,}</span>' for k, v in dv.items())
-                    + '</div><div class="pt-note" style="font-size:11px;margin-top:-6px">On your gear (each item\'s own '
-                    'numbers, before your passives and other bonuses)</div>')
+            dv, rv = defences(items), resistances(items)
+            dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower())
+                      for k, v in dv.items() if k != "Ward" or v]
+            rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower()) for k, v in rv.items()]
+            row = (lambda cs: f'<div class="pt-def" style="grid-template-columns:repeat({len(cs)}, 1fr)">' + "".join(
+                f'<span class="{c}"><small>{esc(k)}</small>{esc(v)}</span>' for k, v, c in cs) + "</div>")
+            ui.html(row(dcells) + row(rcells) +
+                    '<div class="pt-note" style="font-size:11px">From your gear only: each item\'s own defences and '
+                    'resistance mods, before the passive tree, the act penalty and other bonuses.</div>')
             if jewels or abyss:
                 ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
                 ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
@@ -355,7 +388,7 @@ def _show(snap: dict | None, prev: dict | None) -> None:
 _AREAS = {"Weapon": "1 / 1 / 5 / 3", "Offhand": "1 / 7 / 5 / 9", "Weapon2": "1 / 1 / 5 / 3", "Offhand2": "1 / 7 / 5 / 9",
           "Helm": "1 / 4 / 3 / 6", "Amulet": "3 / 6 / 4 / 7", "BodyArmour": "3 / 4 / 6 / 6", "Ring": "4 / 3 / 5 / 4",
           "Ring2": "4 / 6 / 5 / 7", "Gloves": "5 / 1 / 7 / 3", "Belt": "6 / 4 / 7 / 6", "Boots": "5 / 7 / 7 / 9",
-          "Trinket": "8 / 2 / 9 / 3"}
+          "Trinket": "8 / 1 / 9 / 2"}
 _SOCKET = {"R": "#a04034", "G": "#4f8a48", "B": "#4a68a6", "W": "#b9b3a6", "A": "#3a3a3a", "DV": "#7a7a7a"}
 
 
@@ -411,7 +444,7 @@ def _paperdoll(items: list[dict]) -> str:
                 f'data-b="{esc(base if name else "")}" data-c="{RARITY.get(it.get("frameType"), "#c8c8c8")}" '
                 f'data-tip="{esc(item_card(it, gems))}">'
                 + (f'<img src="{esc(icon)}" alt="" loading="lazy">' if icon else f'<span>{esc(name or base)}</span>')
-                + _sockets(it) + (f'<u class="q">{esc(q)}</u>' if (q := _quality(it)) else "") + "</div>")
+                + _sockets(it) + "</div>")
     html_ = ""
     has_swap = bool(by.get("Weapon2") or by.get("Offhand2"))
     for key, area in _AREAS.items():
@@ -421,7 +454,7 @@ def _paperdoll(items: list[dict]) -> str:
     for key, area in (("Weapon", "1 / 1 / 5 / 3"), ("Offhand", "1 / 7 / 5 / 9"), ("Helm", "1 / 4 / 3 / 6"),
                       ("BodyArmour", "3 / 4 / 6 / 6"), ("Gloves", "5 / 1 / 7 / 3"), ("Boots", "5 / 7 / 7 / 9"),
                       ("Belt", "6 / 4 / 7 / 6"), ("Amulet", "3 / 6 / 4 / 7"), ("Ring", "4 / 3 / 5 / 4"),
-                      ("Ring2", "4 / 6 / 5 / 7"), ("Trinket", "8 / 2 / 9 / 3")):
+                      ("Ring2", "4 / 6 / 5 / 7"), ("Trinket", "8 / 1 / 9 / 2")):
         if not by.get(key):
             html_ += f'<div class="pt-inv empty" style="grid-area:{area}"></div>'
     flasks = sorted(by.get("Flask", []), key=lambda i: i.get("x", 0))
