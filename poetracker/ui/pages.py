@@ -1154,8 +1154,10 @@ def character_page():
         info = next((c for c in chars if c["id"] == cid), {})
         hrs = (d["total_active_s"] or 0) / 3600
         maps = info.get("maps") or 0
-        tiles = [("Level", str(ch["level"] or "–"), ""),
-                 ("Played", fmt.hours(d["total_active_s"]), ""),
+        days = sum(1 for x in d.get("daily") or [] if (x.get("active_s") or 0) > 0)
+        lv = ch["level"] or 0
+        tiles = [("Level", str(lv or "–"), "max level" if lv >= 100 else f"{100 - lv} to 100" if lv else ""),
+                 ("Played", fmt.hours(d["total_active_s"]), f"over {days} day{'s' if days != 1 else ''}" if days else ""),
                  ("Maps", fmt.num(maps), f"{maps / hrs:.1f} per hour" if hrs >= 1 and maps else ""),
                  ("Deaths", fmt.num(d["death_count"]), f"{d['death_count'] / hrs:.1f} per hour" if hrs >= 1 else "")]
         esc_ = __import__("html").escape
@@ -1165,7 +1167,7 @@ def character_page():
             f'<div class="cl">{esc_(ch["class"] or "")}{" · " + esc_(ch.get("league") or "") if ch.get("league") else ""}</div>'
             f'<div class="dt">First seen {fmt.date(ch["first_seen"])} · last played {fmt.when(ch["last_seen"])}</div></div>'
             '<div class="tiles">' + "".join(
-                f'<div><small>{k}</small><b>{esc_(v)}</b>' + (f'<i>{esc_(sub)}</i>' if sub else "") + "</div>"
+                f'<div><small>{k}</small><b>{esc_(v)}</b><i>{esc_(sub) or "&nbsp;"}</i></div>'
                 for k, v, sub in tiles) + "</div></div>").classes("w-full")
 
     @ui.refreshable

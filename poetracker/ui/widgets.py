@@ -284,11 +284,12 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-charhead .nm { font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; letter-spacing: .03em; color: var(--ex-gold-hi); line-height: 1.15; }
 .pt-charhead .cl { font-size: 15px; color: var(--ex-text); margin-top: 2px; }
 .pt-charhead .dt { font-size: 12.5px; color: var(--ex-muted); margin-top: 2px; }
-.pt-charhead .tiles { display: flex; gap: 28px; flex-wrap: wrap; }
-.pt-charhead .tiles div { display: flex; flex-direction: column; min-width: 70px; }
+.pt-charhead .tiles { display: grid; grid-template-columns: repeat(4, minmax(110px, auto)); gap: 0 28px; }
+.pt-charhead .tiles div { display: flex; flex-direction: column; padding-left: 14px; border-left: 1px solid var(--ex-line); }
 .pt-charhead .tiles small { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-charhead .tiles b { font-size: 26px; font-weight: 700; color: var(--ex-text); line-height: 1.15; font-variant-numeric: tabular-nums; }
-.pt-charhead .tiles i { font-style: normal; font-size: 12px; color: var(--ex-muted); }
+.pt-charhead .tiles i { font-style: normal; font-size: 12px; color: var(--ex-muted); white-space: nowrap; }
+@media (max-width: 900px) { .pt-charhead .tiles { grid-template-columns: repeat(2, minmax(110px, auto)); gap: 10px 20px; } }
 /* snapshot: the inventory as the game draws it, jewels, skills */
 .pt-snaphead { font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--ex-gold-hi); }
 .pt-paperdoll { position: relative; flex: none; padding: 34px 18px 18px; border-radius: 4px;
@@ -330,13 +331,14 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
   background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }
 .pt-swap button.on { color: #14110f; background: #c9a35a; border-color: #e2c27a; }
-.pt-jewels { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 10px; max-width: 542px; }
-.pt-jewel { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; cursor: help;
-  font-size: 12.5px; line-height: 1.25; min-width: 0; }
-.pt-jewel:hover { border-color: var(--ex-line); background: rgba(255,255,255,.03); }
-.pt-jewel img { width: 34px; height: 34px; object-fit: contain; flex: none;
-  background: radial-gradient(circle, #1d2240 0%, #0b0d1e 80%); border: 1px solid #4a4134; border-radius: 3px; }
-.pt-jewel span { overflow: hidden; text-overflow: ellipsis; }
+.pt-jewelgrp { margin-bottom: 8px; }
+.pt-jewelgrp .k { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ex-muted); margin-bottom: 4px; }
+.pt-jewels { display: grid; grid-template-columns: repeat(auto-fill, 52px); gap: 6px; width: 542px; max-width: 100%; }
+.pt-jewel { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: help; border-radius: 2px;
+  border: 1px solid var(--rc, #4a4134); background: radial-gradient(circle at 50% 40%, #2a2a33 0%, #121218 75%);
+  box-shadow: inset 0 0 8px rgba(0,0,0,.7); }
+.pt-jewel:hover { box-shadow: inset 0 0 8px rgba(0,0,0,.7), 0 0 0 1px var(--rc, #c9a35a); }
+.pt-jewel img { width: 44px; height: 44px; object-fit: contain; }
 /* skills: one card per link group, gems as a chain of linked sockets */
 .pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 10px; width: 100%; }
 .pt-skill { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--ex-line); border-radius: 3px;

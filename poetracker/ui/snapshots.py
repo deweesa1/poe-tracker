@@ -385,8 +385,8 @@ def _build(snap: dict) -> None:
             ui.html(row(dcells) + row(rcells))
             if jewels or abyss:
                 ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
-                ui.html(f'<div class="pt-jewels">{"".join(_jewel_row(j) for j in jewels + abyss)}</div>')
-        with ui.column().classes("gap-2").style("flex:1 1 420px;min-width:320px"):
+                ui.html(_jewels_html(jewels, abyss))
+        with ui.column().classes("gap-3").style("flex:1 1 420px;min-width:320px"):
             ui.label("Skills").classes("pt-snaphead")
             ui.html(f'<div class="pt-skills">{_skills(items)}</div>' if _skills(items) else
                     '<div class="pt-note">No gems.</div>').classes("w-full")
@@ -577,9 +577,23 @@ def _item_supports(it: dict) -> list[tuple[str, str]]:
     return out
 
 
+_JEWEL_EDGE = {0: "#6b6862", 1: "#5a5ab0", 2: "#a69a3e", 3: "#9a5a2a", 9: "#5a8a48"}
+
+
+def _jewels_html(tree_jewels: list[dict], abyss: list[dict]) -> str:
+    """Jewels as icon tiles (hover for the card), grouped: cluster, regular, abyss; any number fit."""
+    cluster = [j for j in tree_jewels if "Cluster Jewel" in (j.get("typeLine") or j.get("baseType") or "")]
+    regular = [j for j in tree_jewels if j not in cluster]
+    out = ""
+    for title, js in (("Cluster jewels", cluster), ("Jewels", regular), ("Abyss jewels (in gear)", abyss)):
+        if js:
+            out += (f'<div class="pt-jewelgrp"><div class="k">{title} · {len(js)}</div><div class="pt-jewels">'
+                    + "".join(_jewel_row(j) for j in js) + "</div></div>")
+    return out
+
+
 def _jewel_row(j: dict) -> str:
-    col = RARITY.get(j.get("frameType"), "#c8c8c8")
-    return (f'<div class="pt-jewel pt-tipable" data-n="{esc(j.get("name") or j.get("typeLine") or "")}" '
-            f'data-tip="{esc(item_card(j))}">'
-            + (f'<img src="{esc(j.get("icon") or "")}" alt="" loading="lazy">' if j.get("icon") else "")
-            + f'<span style="color:{col}">{esc(_item_name(j))}</span></div>')
+    col = _JEWEL_EDGE.get(j.get("frameType"), "#4a4134")
+    return (f'<div class="pt-jewel pt-tipable" style="--rc:{col}" data-tip="{esc(item_card(j))}">'
+            + (f'<img src="{esc(j.get("icon") or "")}" alt="" loading="lazy">' if j.get("icon")
+               else f'<span>{esc(_item_name(j)[:2])}</span>') + "</div>")
