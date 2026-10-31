@@ -81,7 +81,7 @@ def item_card(it: dict, gems_line: str = "") -> str:
     left = syms[0] if syms else None
     right = syms[1] if len(syms) > 1 else left
     text_tags = [label for k, label in marks if k not in syms]
-    sym = (lambda k, side: f'<img class="ic-sym {side}" src="/icons/{k}.png" alt="">' if k else "")
+    sym = (lambda k, side: f'<img class="ic-sym {side}" src="/icons/{icons.name(k)}" alt="">' if k else "")
     head = (f'<div class="ic-head {frame}">{sym(left, "l")}{sym(right, "r")}'
             + (f'<div>{esc(name)}</div>' if name else "") + f'<div>{esc(base)}</div>'
             + (f'<div class="ic-tags">{" · ".join(esc(t) for t in text_tags)}</div>' if text_tags else "") + "</div>")

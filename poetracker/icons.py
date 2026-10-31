@@ -1,9 +1,10 @@
 """Influence, fractured and synthesised symbols for item cards.
 
 The small round symbols come from Path of Building's assets on GitHub
-(github.com/PathOfBuildingCommunity/PathOfBuilding, src/Assets); the art
-is Grinding Gear Games'. They're downloaded once into the data folder
-(icons/), not shipped with the app."""
+(github.com/PathOfBuildingCommunity/PathOfBuilding, src/Assets); the
+Searing Exarch and Eater of Worlds ones are their altar icons as poedb.tw
+shows them. The art is Grinding Gear Games'. They're downloaded once into
+the data folder (icons/), not shipped with the app."""
 from __future__ import annotations
 
 import logging
@@ -15,9 +16,16 @@ from . import paths
 log = logging.getLogger(__name__)
 
 RAW = "https://raw.githubusercontent.com/PathOfBuildingCommunity/PathOfBuilding/master/src/Assets/"
-FILES = {"crusader": "crusadericon.png", "elder": "eldericon.png", "fractured": "fracturedicon.png",
-         "hunter": "huntericon.png", "redeemer": "redeemericon.png", "shaper": "shapericon.png",
-         "synthesised": "synthesisicon.png", "warlord": "warlordicon.png"}
+POEDB = "https://cdn.poedb.tw/image/Art/2DArt/minimap/player/"
+FILES = {"crusader": RAW + "crusadericon.png", "elder": RAW + "eldericon.png", "fractured": RAW + "fracturedicon.png",
+         "hunter": RAW + "huntericon.png", "redeemer": RAW + "redeemericon.png", "shaper": RAW + "shapericon.png",
+         "synthesised": RAW + "synthesisicon.png", "warlord": RAW + "warlordicon.png",
+         "searing": POEDB + "CleansingFireAltar.webp", "tangled": POEDB + "TangleAltar.webp"}
+
+
+def name(key: str) -> str:
+    """The saved file's name, e.g. shaper.png or searing.webp."""
+    return key + "." + FILES[key].rsplit(".", 1)[-1]
 _state = {"busy": False}
 
 
@@ -28,24 +36,27 @@ def cache_dir():
 
 
 def have(key: str) -> bool:
-    return key in FILES and (cache_dir() / f"{key}.png").exists()
+    return key in FILES and (cache_dir() / name(key)).exists()
 
 
 def ensure() -> None:
-    if _state["busy"] or all(have(k) for k in FILES):
+    import time
+    if _state["busy"] or all(have(k) for k in FILES) or time.time() - _state.get("tried", 0) < 3600:
         return
+    _state["tried"] = time.time()
     _state["busy"] = True
 
     def run():
         try:
-            for k, f in FILES.items():
+            for k, url in FILES.items():
                 if have(k):
                     continue
-                req = urllib.request.Request(RAW + f, headers={"User-Agent": "poe-tracker (item symbols)"})
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    (cache_dir() / f"{k}.png").write_bytes(r.read())
-        except Exception as e:
-            log.warning("item symbols download failed: %s", e)
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "poe-tracker (item symbols)"})
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        (cache_dir() / name(k)).write_bytes(r.read())
+                except Exception as e:          # that one stays a text tag
+                    log.warning("item symbol %s download failed: %s", k, e)
         finally:
             _state["busy"] = False
     threading.Thread(target=run, daemon=True, name="icons").start()
