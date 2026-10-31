@@ -1,6 +1,7 @@
 """All dashboard pages."""
 from __future__ import annotations
 
+import html
 import json
 
 from nicegui import ui
@@ -8,15 +9,26 @@ from nicegui import ui
 from .. import captures, config as config_mod, db, metrics
 from . import fmt
 from .layout import (STATE, auto_refresh, character_select, frame, head_tabs, is_open, league_select, league_start,
-                     locked)
+                     locked, on_event, reload_page)
 from .widgets import LINE as LINE_C
 from .widgets import (BLUE, GOLD, GREY, HOURS_TIP, PALETTE, RED, TEAL, card, chart, empty, heading, kpis, note, table)
+
+
+ROUTES: dict = {}
+
+
+def route(path: str):
+    """Register a page for the single-window app (see ui/app.py)."""
+    def deco(fn):
+        ROUTES[path] = fn
+        return fn
+    return deco
 
 
 def _reload():
     # Filters and look changes don't change the data, so cached results stay
     # (they're keyed by league/character and expire when new game data arrives).
-    ui.navigate.reload()
+    reload_page()
 
 
 def _filters_league_char():
@@ -77,7 +89,7 @@ def _fill_days(daily: list[dict], keys: list[str]) -> list[dict]:
     return out
 
 
-@ui.page("/")
+@route("/")
 def overview_page():
     lg = STATE.league()
     cid = STATE.character(lg)
@@ -225,23 +237,26 @@ def _open_character(row):
 
 
 # ====================================================================== Maps
-@ui.page("/maps")
+@route("/maps")
 def maps_page():
-    if (r := locked("/maps")):
-        return r
+    if locked("/maps"):
+        return
     lg = STATE.league()
     cid = STATE.character(lg)
     body = frame("/maps", "Maps", _scope(), _filters_league_char)
     tab = STATE.pref("maps_tab", "runs")
     tabs = head_tabs(tab, {"runs": "Maps Ran", "copied": "Detailed Maps"},
-                     lambda e: STATE.set_pref("maps_tab", e.value))
+                     lambda e: (STATE.set_pref("maps_tab", e.value), panel.refresh()))
+
+    @ui.refreshable
+    def panel():                    # only the open tab is built; switching rebuilds it
+        if tabs.value == "copied":
+            copied_tab(lg, cid)
+        else:
+            runs_tab(lg, cid)
 
     with body:
-        with ui.tab_panels(tabs, value=tab).classes("w-full bg-transparent").props("animated=false"):
-            with ui.tab_panel("runs").classes("q-pa-none"):
-                runs_tab(lg, cid)
-            with ui.tab_panel("copied").classes("q-pa-none"):
-                copied_tab(lg, cid)
+        panel()
 
 
 PIE_COLORS = PALETTE + ["#8a7f72", "#b5884a", "#5f8f88", "#7d6aa3", "#a85c4d"]
@@ -538,10 +553,10 @@ def _league_box(lg: str | None, label: str, ts: str | None, sub: str, end: tuple
                     ui.label(end[2]).classes("pt-note").style("font-size:14px")
 
 
-@ui.page("/campaign")
+@route("/campaign")
 def campaign_page():
-    if (r := locked("/campaign")):
-        return r
+    if locked("/campaign"):
+        return
     ls = league_start()
     live = ls["phase"] == "campaign"
     lg = ls["league"] if live else STATE.league()
@@ -553,7 +568,7 @@ def campaign_page():
                  None if live else (lambda: league_select(_reload)))
     holder: dict = {"tabs": head_tabs(STATE.pref("campaign_tab", "splits"),
                                       {"splits": "Progress", "zones": "Acts", "checklist": "Checklist"},
-                                      lambda e: STATE.set_pref("campaign_tab", e.value))}
+                                      lambda e: (STATE.set_pref("campaign_tab", e.value), holder["refresh"]()))}
 
     @ui.refreshable
     def content():
@@ -573,183 +588,186 @@ def campaign_page():
             return "–" if v is None else fmt.num(v, 1)
         tabs = holder["tabs"]
         with ui.tab_panels(tabs, value=tabs.value).classes("w-full bg-transparent").props("animated=false"):
-            with ui.tab_panel("splits").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    after = sp["after_league_start_s"]
-                    _league_box(lg, "You Started", sp["start"],
-                                f"+{fmt.dur(after, True)} after launch · {sp['character']}" if after is not None
-                                else sp["character"] or "")
-                    kpis([
-                        ("Zones per Hour", rate(rt["zones_per_h"]), f"{rt['zones']} zones entered"),
-                        ("Acts per Hour", rate(rt["acts_per_h"]), f"{rt['acts_done']} of 10 acts done"),
-                        ("Levels per Hour", rate(rt["levels_per_h"]), f"level {sp['level_end']}"),
-                        ("Deaths per Hour", rate(rt["deaths_per_h"]), f"{sp['deaths']} deaths"),
-                    ], columns=4, min_width=125)
+            if tabs.value == "splits":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("splits").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        after = sp["after_league_start_s"]
+                        _league_box(lg, "You Started", sp["start"],
+                                    f"+{fmt.dur(after, True)} after launch · {sp['character']}" if after is not None
+                                    else sp["character"] or "")
+                        kpis([
+                            ("Zones per Hour", rate(rt["zones_per_h"]), f"{rt['zones']} zones entered"),
+                            ("Acts per Hour", rate(rt["acts_per_h"]), f"{rt['acts_done']} of 10 acts done"),
+                            ("Levels per Hour", rate(rt["levels_per_h"]), f"level {sp['level_end']}"),
+                            ("Deaths per Hour", rate(rt["deaths_per_h"]), f"{sp['deaths']} deaths"),
+                        ], columns=4, min_width=125)
 
-                    # ---- progress: one equal block per act, filled by how far into it you are
-                    with card("Campaign Progress"):
-                        pct = sp["progress"]
-                        status = ("Campaign complete" if sp["completed"] else
-                                  f"Act {cur} · {sp['current_zone'] or ''}")
-                        ui.html(
-                            f'<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px">'
-                            f'<span style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums">{fmt.clock(sp["play_s"])}</span>'
-                            f'<span style="font-size:20px;color:var(--lg, #d9a441);font-weight:600">{pct * 100:.0f}%</span>'
-                            f'<span class="pt-note" style="font-size:14px">{status}</span></div>').classes("w-full")
-                        # One bar for both: acts you haven't finished share the width equally;
-                        # each finished act resizes to the time it took (relative to your
-                        # average act), so a finished campaign shows time per act.
-                        done_t = [a["time_s"] for a in sp["acts"] if a["finished"] and a["time_s"]]
-                        ref = (sum(done_t) / len(done_t)) if done_t else 1.0
-                        segs = ""
-                        for n in range(1, 11):
-                            a = acts.get(n)
-                            if a and a["finished"]:
-                                grow, fill, bg = max(a["time_s"] / ref, 0.45), 1.0, "var(--lg, #d9a441)"
-                                sub, tip = fmt.dur(a["time_s"], True), f"Act {n}: {fmt.clock(a['time_s'])}"
-                            elif a:
-                                grow, fill, bg = max((a["time_s"] or 0) / ref, 1.0) if done_t else 1.0, a["progress"], "var(--lg-cur, #4fb3a5)"
-                                sub, tip = f"{a['progress'] * 100:.0f}%", f"Act {n}: in progress, {a['progress'] * 100:.0f}% of zones"
-                            else:
-                                grow, fill, bg = 1.0, 0.0, "#4fb3a5"
-                                sub, tip = "", f"Act {n}: not started"
-                            text_c = "#14110f" if fill >= 0.5 else "#a69b8c"
-                            clip = "white-space:nowrap;overflow:hidden;text-overflow:clip;"
-                            segs += (f'<a href="#act-zones-{n}" title="{tip} · click for its zones" style="text-decoration:none;'
-                                     f'flex:{grow:.4f} 1 0;min-width:0;display:block;cursor:pointer"><div style="position:relative;height:44px;'
-                                     f'background:#2d2722;border-radius:5px;overflow:hidden;'
-                                     f'{"" if fill else "outline:1px dashed #4a4038;outline-offset:-1px;"}">'
-                                     f'<div style="position:absolute;inset:0;width:{fill * 100:.1f}%;background:{bg}"></div>'
-                                     f'<div style="position:relative;display:flex;flex-direction:column;justify-content:center;'
-                                     f'align-items:center;height:100%;padding:0 3px;color:{text_c}">'
-                                     f'<span style="font-size:13px;font-weight:700;line-height:1.1;{clip}">{n}</span>'
-                                     f'<span style="font-size:10.5px;font-weight:600;line-height:1.2;opacity:.85;{clip}">{sub}</span>'
-                                     f'</div></div></a>')
-                        ui.html(f'<div class="pt-actbar" style="display:flex;gap:4px;width:100%;margin-bottom:6px">{segs}</div>').classes("w-full")
-                        note("Acts you haven't finished share the bar equally. As you finish one, it fills in and takes the width "
-                             "of the time it took, so the finished bar shows where your time went. The act you're in fills up "
-                             "as you enter its zones. Click an act to open its zones.")
+                        # ---- progress: one equal block per act, filled by how far into it you are
+                        with card("Campaign Progress"):
+                            pct = sp["progress"]
+                            status = ("Campaign complete" if sp["completed"] else
+                                      f"Act {cur} · {sp['current_zone'] or ''}")
+                            ui.html(
+                                f'<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px">'
+                                f'<span style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums">{fmt.clock(sp["play_s"])}</span>'
+                                f'<span style="font-size:20px;color:var(--lg, #d9a441);font-weight:600">{pct * 100:.0f}%</span>'
+                                f'<span class="pt-note" style="font-size:14px">{status}</span></div>').classes("w-full")
+                            # One bar for both: acts you haven't finished share the width equally;
+                            # each finished act resizes to the time it took (relative to your
+                            # average act), so a finished campaign shows time per act.
+                            done_t = [a["time_s"] for a in sp["acts"] if a["finished"] and a["time_s"]]
+                            ref = (sum(done_t) / len(done_t)) if done_t else 1.0
+                            segs = ""
+                            for n in range(1, 11):
+                                a = acts.get(n)
+                                if a and a["finished"]:
+                                    grow, fill, bg = max(a["time_s"] / ref, 0.45), 1.0, "var(--lg, #d9a441)"
+                                    sub, tip = fmt.dur(a["time_s"], True), f"Act {n}: {fmt.clock(a['time_s'])}"
+                                elif a:
+                                    grow, fill, bg = max((a["time_s"] or 0) / ref, 1.0) if done_t else 1.0, a["progress"], "var(--lg-cur, #4fb3a5)"
+                                    sub, tip = f"{a['progress'] * 100:.0f}%", f"Act {n}: in progress, {a['progress'] * 100:.0f}% of zones"
+                                else:
+                                    grow, fill, bg = 1.0, 0.0, "#4fb3a5"
+                                    sub, tip = "", f"Act {n}: not started"
+                                text_c = "#14110f" if fill >= 0.5 else "#a69b8c"
+                                clip = "white-space:nowrap;overflow:hidden;text-overflow:clip;"
+                                segs += (f'<a href="#act-zones-{n}" title="{tip} · click for its zones" style="text-decoration:none;'
+                                         f'flex:{grow:.4f} 1 0;min-width:0;display:block;cursor:pointer"><div style="position:relative;height:44px;'
+                                         f'background:#2d2722;border-radius:5px;overflow:hidden;'
+                                         f'{"" if fill else "outline:1px dashed #4a4038;outline-offset:-1px;"}">'
+                                         f'<div style="position:absolute;inset:0;width:{fill * 100:.1f}%;background:{bg}"></div>'
+                                         f'<div style="position:relative;display:flex;flex-direction:column;justify-content:center;'
+                                         f'align-items:center;height:100%;padding:0 3px;color:{text_c}">'
+                                         f'<span style="font-size:13px;font-weight:700;line-height:1.1;{clip}">{n}</span>'
+                                         f'<span style="font-size:10.5px;font-weight:600;line-height:1.2;opacity:.85;{clip}">{sub}</span>'
+                                         f'</div></div></a>')
+                            ui.html(f'<div class="pt-actbar" style="display:flex;gap:4px;width:100%;margin-bottom:6px">{segs}</div>').classes("w-full")
+                            note("Acts you haven't finished share the bar equally. As you finish one, it fills in and takes the width "
+                                 "of the time it took, so the finished bar shows where your time went. The act you're in fills up "
+                                 "as you enter its zones. Click an act to open its zones.")
 
-                    # ---- act splits
-                    with card("Act Splits"):
-                        rows = []
-                        for n in range(1, 11):
-                            a = acts.get(n)
-                            if not a:
-                                rows.append({"act": n, "start_split": None, "split": None, "time_s": None, "levels": "–", "deaths": None,
-                                             "zone_count": None, "town_s": None, "end_utc": None, "_state": "pending"})
-                                continue
-                            rows.append({**a, "levels": f"{a['level_start']} → {a['level_end']}",
-                                         "_state": "done" if a["finished"] else "running"})
-                        table([
-                            {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
-                            {"name": "start_split", "label": "Timer at Start", "num": True,
-                             "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
-                            {"name": "split", "label": "Timer at Finish", "num": True,
-                             "fmt": lambda v, r: fmt.clock(v) if r["_state"] == "done" else ("running" if r["_state"] == "running" else "–")},
-                            {"name": "time_s", "label": "Time in Act", "num": True, "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
-                            {"name": "levels", "label": "Level", "num": True, "sortable": False},
-                            {"name": "deaths", "label": "Deaths", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
-                            {"name": "zone_count", "label": "Zones", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
-                            {"name": "town_s", "label": "Town Time", "num": True, "fmt": lambda v, r: fmt.dur(v) if v is not None else "–"},
-                            {"name": "end_utc", "label": "Finished On", "fmt": lambda v, r: fmt.when(v) if v else
-                             ("In progress" if r["_state"] == "running" else "–")},
-                        ], rows, page_size=10)
-                        note("The timer is your campaign play time: it starts when you enter The Twilight Strand and leaves out AFK. "
-                             "Timer at Start/Finish is where it stood when the act began and ended; Time in Act is the difference.")
-
-
-            with ui.tab_panel("checklist").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    # ---- passive points from quests
-                    qp = sp["passives"]
-                    with card(f"Quest Passive Points · {qp['got']} of {qp['total']}"):
-                        mark = {"done": "✓", "missed": "Missed", "maybe": "?", "pending": "–", "helped": "–"}
-                        qrows = [{**q, "act_n": q["act"]} for q in qp["quests"]]
-                        table([
-                            {"name": "act_n", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
-                            {"name": "quest", "label": "Quest", "sortable": False},
-                            {"name": "how", "label": "What to Do", "sortable": False},
-                            {"name": "town", "label": "Reward In", "sortable": False, "opt": True},
-                            {"name": "points", "label": "Points", "num": True},
-                            {"name": "status", "label": "Got", "sortable": False, "align": "center",
-                             "fmt": lambda v, r: r.get("helped") if v == "helped" else mark[v]},
-                        ], qrows, page_size=len(qrows))
-                        missed = [q for q in qp["quests"] if q["status"] == "missed"]
-                        unsure = [q for q in qp["quests"] if q["status"] == "maybe"]
-                        parts = [f"{qp['in_campaign']} of these points came during the campaign."]
-                        if qp.get("helped"):
-                            parts.append(f"You helped {qp['helped']['bandit']} ({qp['helped']['reward']}) instead of taking the "
-                                         f"bandit point, so {qp['total']} points were available.")
-                        if missed:
-                            parts.append("Missed: " + ", ".join(q["quest"] for q in missed) + ".")
-                        if unsure:
-                            parts.append("? = that town gave fewer points than it has quests, so one of these is missing: "
-                                         + " / ".join(q["quest"] for q in unsure) + ". Type /passives in game and the tracker will "
-                                         "read exactly which.")
-                        parts.append(f"Confirmed with /passives on {fmt.when(qp['report_utc'])}." if qp["report_utc"] else
-                                     "Worked out from the points each town's quest givers handed you; type /passives in game to confirm.")
-                        note(" ".join(parts))
-
-                    # ---- bosses
-                    with card("Campaign Bosses"):
-                        brows = [{**b, "zone": b["zone"] or "–"} for b in sp["bosses"]]
-                        table([
-                            {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
-                            {"name": "boss", "label": "Boss", "sortable": False},
-                            {"name": "zone", "label": "Zone", "sortable": False},
-                            {"name": "done", "label": "Defeated", "sortable": False, "align": "center",
-                             "fmt": lambda v, r: "✓" if v else ("not yet" if r["entered"] else "–")},
-                            {"name": "split", "label": "Timer at Kill", "num": True, "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
-                            {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
-                            {"name": "deaths", "label": "Deaths", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
-                        ], brows, page_size=len(brows))
-                        note("Bosses you must kill to move on. One counts as defeated when you reach the zone it blocks; the timer is "
-                             "when you got there. Optional bosses (Fairgraves, the Weaver, Abberath…) leave no trace in the log.")
-
-                    # ---- trials
-                    with card("Trials of Ascendancy"):
-                        labs = {l["lab"].split()[0]: l for l in sp["labs"]}
-                        trows = []
-                        for t in sp["trials"]:
-                            trows.append({**t, "lab_done": labs.get(t["lab"], {}).get("done")})
-                        table([
-                            {"name": "lab", "label": "Labyrinth", "sortable": False},
-                            {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
-                            {"name": "zone", "label": "Zone", "sortable": False},
-                            {"name": "done", "label": "Status", "sortable": False,
-                             "fmt": lambda v, r: "✓ Completed" if v else ("Not completed" if r["entered"] else "–")},
-                            {"name": "split", "label": "Timer at Completion", "num": True,
-                             "fmt": lambda v, r: fmt.clock(v) if v is not None else ("after the campaign" if r["after_campaign"] else "–")},
-                            {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
-                        ], trows, page_size=len(trows))
-                        note("A trial counts as completed when Izaro speaks after you finish it (needs Output Dialogue To Chat).")
-
-
-            with ui.tab_panel("zones").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    # ---- zones, always open
-                    with card("Zones"):
-                        for a in sp["acts"]:
-                            title = (f"Act {a['act']} · {fmt.clock(a['time_s'])} · level {a['level_start']} → {a['level_end']} · "
-                                     f"{a['deaths']} death{'s' if a['deaths'] != 1 else ''}" + ("" if a["finished"] else " · in progress"))
-                            ui.label(title).classes("text-weight-bold q-mt-md pt-zone-head").style("color:var(--ex-gold, #d9a441);scroll-margin-top:90px").props(
-                                f'id=act-zones-{a["act"]}')
-                            rows = [{**z, "levels": f"{z['level_in']} → {z['level_out']}",
-                                     "zone": z["zone"] + (f"  (Act {z['zone_act']})" if z["zone_act"] and z["zone_act"] != a["act"] else "")}
-                                    for z in a["zones"]]
+                        # ---- act splits
+                        with card("Act Splits"):
+                            rows = []
+                            for n in range(1, 11):
+                                a = acts.get(n)
+                                if not a:
+                                    rows.append({"act": n, "start_split": None, "split": None, "time_s": None, "levels": "–", "deaths": None,
+                                                 "zone_count": None, "town_s": None, "end_utc": None, "_state": "pending"})
+                                    continue
+                                rows.append({**a, "levels": f"{a['level_start']} → {a['level_end']}",
+                                             "_state": "done" if a["finished"] else "running"})
                             table([
+                                {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
+                                {"name": "start_split", "label": "Timer at Start", "num": True,
+                                 "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
+                                {"name": "split", "label": "Timer at Finish", "num": True,
+                                 "fmt": lambda v, r: fmt.clock(v) if r["_state"] == "done" else ("running" if r["_state"] == "running" else "–")},
+                                {"name": "time_s", "label": "Time in Act", "num": True, "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
+                                {"name": "levels", "label": "Level", "num": True, "sortable": False},
+                                {"name": "deaths", "label": "Deaths", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
+                                {"name": "zone_count", "label": "Zones", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
+                                {"name": "town_s", "label": "Town Time", "num": True, "fmt": lambda v, r: fmt.dur(v) if v is not None else "–"},
+                                {"name": "end_utc", "label": "Finished On", "fmt": lambda v, r: fmt.when(v) if v else
+                                 ("In progress" if r["_state"] == "running" else "–")},
+                            ], rows, page_size=10)
+                            note("The timer is your campaign play time: it starts when you enter The Twilight Strand and leaves out AFK. "
+                                 "Timer at Start/Finish is where it stood when the act began and ended; Time in Act is the difference.")
+
+
+            if tabs.value == "checklist":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("checklist").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        # ---- passive points from quests
+                        qp = sp["passives"]
+                        with card(f"Quest Passive Points · {qp['got']} of {qp['total']}"):
+                            mark = {"done": "✓", "missed": "Missed", "maybe": "?", "pending": "–", "helped": "–"}
+                            qrows = [{**q, "act_n": q["act"]} for q in qp["quests"]]
+                            table([
+                                {"name": "act_n", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
+                                {"name": "quest", "label": "Quest", "sortable": False},
+                                {"name": "how", "label": "What to Do", "sortable": False},
+                                {"name": "town", "label": "Reward In", "sortable": False, "opt": True},
+                                {"name": "points", "label": "Points", "num": True},
+                                {"name": "status", "label": "Got", "sortable": False, "align": "center",
+                                 "fmt": lambda v, r: r.get("helped") if v == "helped" else mark[v]},
+                            ], qrows, page_size=len(qrows))
+                            missed = [q for q in qp["quests"] if q["status"] == "missed"]
+                            unsure = [q for q in qp["quests"] if q["status"] == "maybe"]
+                            parts = [f"{qp['in_campaign']} of these points came during the campaign."]
+                            if qp.get("helped"):
+                                parts.append(f"You helped {qp['helped']['bandit']} ({qp['helped']['reward']}) instead of taking the "
+                                             f"bandit point, so {qp['total']} points were available.")
+                            if missed:
+                                parts.append("Missed: " + ", ".join(q["quest"] for q in missed) + ".")
+                            if unsure:
+                                parts.append("? = that town gave fewer points than it has quests, so one of these is missing: "
+                                             + " / ".join(q["quest"] for q in unsure) + ". Type /passives in game and the tracker will "
+                                             "read exactly which.")
+                            parts.append(f"Confirmed with /passives on {fmt.when(qp['report_utc'])}." if qp["report_utc"] else
+                                         "Worked out from the points each town's quest givers handed you; type /passives in game to confirm.")
+                            note(" ".join(parts))
+
+                        # ---- bosses
+                        with card("Campaign Bosses"):
+                            brows = [{**b, "zone": b["zone"] or "–"} for b in sp["bosses"]]
+                            table([
+                                {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
+                                {"name": "boss", "label": "Boss", "sortable": False},
                                 {"name": "zone", "label": "Zone", "sortable": False},
-                                {"name": "entered", "label": "Timer at Entry", "num": True, "sortable": False,
-                                 "fmt": lambda v, r: fmt.clock(v) if v is not None else ""},
-                                {"name": "time_s", "label": "Time in Zone", "num": True, "sortable": False,
-                                 "fmt": lambda v, r: fmt.dur(v) if v is not None else "–"},
-                                {"name": "levels", "label": "Level In → Out", "num": True, "sortable": False},
-                                {"name": "deaths", "label": "Deaths", "num": True, "sortable": False, "fmt": lambda v, r: "" if v is None else str(v)},
-                                {"name": "visits", "label": "Visits", "num": True, "sortable": False, "fmt": lambda v, r: "" if v is None else str(v)},
-                            ], rows, page_size=len(rows))
-                        note("Zones in the order you first entered them. Time in Zone adds up every visit during that act; "
-                             "a zone from an earlier act shows the act it belongs to. Visits above 1 mean you went back.")
+                                {"name": "done", "label": "Defeated", "sortable": False, "align": "center",
+                                 "fmt": lambda v, r: "✓" if v else ("not yet" if r["entered"] else "–")},
+                                {"name": "split", "label": "Timer at Kill", "num": True, "fmt": lambda v, r: fmt.clock(v) if v is not None else "–"},
+                                {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
+                                {"name": "deaths", "label": "Deaths", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
+                            ], brows, page_size=len(brows))
+                            note("Bosses you must kill to move on. One counts as defeated when you reach the zone it blocks; the timer is "
+                                 "when you got there. Optional bosses (Fairgraves, the Weaver, Abberath…) leave no trace in the log.")
+
+                        # ---- trials
+                        with card("Trials of Ascendancy"):
+                            labs = {l["lab"].split()[0]: l for l in sp["labs"]}
+                            trows = []
+                            for t in sp["trials"]:
+                                trows.append({**t, "lab_done": labs.get(t["lab"], {}).get("done")})
+                            table([
+                                {"name": "lab", "label": "Labyrinth", "sortable": False},
+                                {"name": "act", "label": "Act", "fmt": lambda v, r: f"Act {v}"},
+                                {"name": "zone", "label": "Zone", "sortable": False},
+                                {"name": "done", "label": "Status", "sortable": False,
+                                 "fmt": lambda v, r: "✓ Completed" if v else ("Not completed" if r["entered"] else "–")},
+                                {"name": "split", "label": "Timer at Completion", "num": True,
+                                 "fmt": lambda v, r: fmt.clock(v) if v is not None else ("after the campaign" if r["after_campaign"] else "–")},
+                                {"name": "level", "label": "Level", "num": True, "fmt": lambda v, r: "–" if v is None else str(v)},
+                            ], trows, page_size=len(trows))
+                            note("A trial counts as completed when Izaro speaks after you finish it (needs Output Dialogue To Chat).")
+
+
+            if tabs.value == "zones":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("zones").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        # ---- zones, always open
+                        with card("Zones"):
+                            for a in sp["acts"]:
+                                title = (f"Act {a['act']} · {fmt.clock(a['time_s'])} · level {a['level_start']} → {a['level_end']} · "
+                                         f"{a['deaths']} death{'s' if a['deaths'] != 1 else ''}" + ("" if a["finished"] else " · in progress"))
+                                ui.label(title).classes("text-weight-bold q-mt-md pt-zone-head").style("color:var(--ex-gold, #d9a441);scroll-margin-top:90px").props(
+                                    f'id=act-zones-{a["act"]}')
+                                rows = [{**z, "levels": f"{z['level_in']} → {z['level_out']}",
+                                         "zone": z["zone"] + (f"  (Act {z['zone_act']})" if z["zone_act"] and z["zone_act"] != a["act"] else "")}
+                                        for z in a["zones"]]
+                                table([
+                                    {"name": "zone", "label": "Zone", "sortable": False},
+                                    {"name": "entered", "label": "Timer at Entry", "num": True, "sortable": False,
+                                     "fmt": lambda v, r: fmt.clock(v) if v is not None else ""},
+                                    {"name": "time_s", "label": "Time in Zone", "num": True, "sortable": False,
+                                     "fmt": lambda v, r: fmt.dur(v) if v is not None else "–"},
+                                    {"name": "levels", "label": "Level In → Out", "num": True, "sortable": False},
+                                    {"name": "deaths", "label": "Deaths", "num": True, "sortable": False, "fmt": lambda v, r: "" if v is None else str(v)},
+                                    {"name": "visits", "label": "Visits", "num": True, "sortable": False, "fmt": lambda v, r: "" if v is None else str(v)},
+                                ], rows, page_size=len(rows))
+                            note("Zones in the order you first entered them. Time in Zone adds up every visit during that act; "
+                                 "a zone from an earlier act shows the act it belongs to. Visits above 1 mean you went back.")
 
 
     def act_jump(e):
@@ -758,16 +776,9 @@ def campaign_page():
             holder["tabs"].set_value("zones")
         ui.run_javascript(f'setTimeout(() => document.getElementById("act-zones-{n}")'
                           f'?.scrollIntoView({{behavior: "smooth"}}), 200)')
-    ui.on("act_jump", act_jump)
-    ui.add_body_html("""<script>
-document.addEventListener("click", (e) => {
-  const a = e.target.closest(".pt-actbar a");
-  if (!a) return;
-  e.preventDefault();
-  emitEvent("act_jump", a.getAttribute("href").split("-").pop());
-});
-</script>""")
+    on_event("act_jump", act_jump)
 
+    holder["refresh"] = content.refresh
     with body:
         content()
     auto_refresh(content.refresh)
@@ -799,10 +810,10 @@ def _rate(v, d: int = 1) -> str:
     return "–" if v is None else fmt.num(v, d)
 
 
-@ui.page("/mapping")
+@route("/mapping")
 def mapping_page():
-    if (r := locked("/mapping")):
-        return r
+    if locked("/mapping"):
+        return
     ls = league_start()
     live = ls["phase"] == "mapping"
     lg = ls["league"] if live else STATE.league()
@@ -813,7 +824,7 @@ def mapping_page():
                  None if live else (lambda: league_select(_reload)))
     holder: dict = {"tabs": head_tabs(STATE.pref("mapping_tab", "progress"),
                                       {"progress": "Progress", "voidstones": "Voidstones", "checklist": "Checklist"},
-                                      lambda e: STATE.set_pref("mapping_tab", e.value))}
+                                      lambda e: (STATE.set_pref("mapping_tab", e.value), holder["refresh"]()))}
 
     @ui.refreshable
     def content():
@@ -825,33 +836,32 @@ def mapping_page():
             return empty("No characters in this league yet.")
         tabs = holder["tabs"]
         with ui.tab_panels(tabs, value=tabs.value).classes("w-full bg-transparent").props("animated=false"):
-            with ui.tab_panel("progress").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    _mapping_progress(lg, m)
-            with ui.tab_panel("voidstones").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    _mapping_voidstones(m, holder)
-            with ui.tab_panel("checklist").classes("q-pa-none"):
-                with ui.column().classes("w-full gap-4"):
-                    _mapping_checklist(lg, m)
+            if tabs.value == "progress":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("progress").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        _mapping_progress(lg, m)
+            if tabs.value == "voidstones":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("voidstones").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        _mapping_voidstones(m)
+            if tabs.value == "checklist":      # only the open tab is built (switching rebuilds)
+                with ui.tab_panel("checklist").classes("q-pa-none"):
+                    with ui.column().classes("w-full gap-4"):
+                        _mapping_checklist(lg, m, holder)
 
     def stone_jump(e):
-        i = str(e.args).strip('[]"\' ')
-        if holder.get("tabs"):
-            holder["tabs"].set_value("voidstones")
-        if holder.get("stones"):
-            holder["stones"].set_value(f"stone{i}")
-        STATE.set_pref("mapping_stone", f"stone{i}")
-    ui.on("stone_jump", stone_jump)
-    ui.add_body_html("""<script>
-document.addEventListener("click", (e) => {
-  const a = e.target.closest("a.pt-stone");
-  if (!a) return;
-  e.preventDefault();
-  emitEvent("stone_jump", a.dataset.i);
-});
-</script>""")
+        i = int(str(e.args).strip('[]"\' ') or 0)
+        holder["tabs"].set_value("voidstones")
+        ui.run_javascript(f'setTimeout(() => document.getElementById("stone-box-{i}")'
+                          f'?.scrollIntoView({{behavior: "smooth", block: "start"}}), 200)')
+    on_event("stone_jump", stone_jump)
 
+    def map_toggle(e):
+        name, value = e.args
+        _map_tick(lg, name, bool(value), (holder.get("ran") or {}).get(name))
+    on_event("map_toggle", map_toggle)
+
+    holder["refresh"] = content.refresh
     with body:
         content()
     auto_refresh(content.refresh)
@@ -973,103 +983,96 @@ def _mapping_progress(lg: str, m: dict) -> None:
              "counts only the climb to your highest tier, so it doesn't drop while you farm.")
 
 
-def _mapping_voidstones(m: dict, holder: dict) -> None:
+def _mapping_voidstones(m: dict) -> None:
     vs = (m.get("voidstones") or {}).get("voidstones") or []
     if not vs:
         return empty("No voidstones set up in milestones.yaml.")
-    cur = STATE.pref("mapping_stone", "stone0")
-    if cur not in {f"stone{i}" for i in range(len(vs))}:
-        cur = "stone0"
-    with ui.tabs(value=cur, on_change=lambda e: STATE.set_pref("mapping_stone", e.value)).props(
-            "dense align=left no-caps active-color=primary indicator-color=primary inline-label outside-arrows mobile-arrows").classes(
-            "text-grey-5") as tabs:
-        for i, s in enumerate(vs):
-            ui.tab(f"stone{i}", ("☑ " if s["obtained"] else "☐ ") + s["name"].replace(" Voidstone", ""))
-    holder["stones"] = tabs
-    with ui.tab_panels(tabs, value=cur).classes("w-full bg-transparent").style("width:100%").props("animated=false"):
-        for i, s in enumerate(vs):
-            with ui.tab_panel(f"stone{i}").classes("q-pa-none w-full").style("width:100%"):
-                rows = [x for x in m["milestones"] if x["group"] == s["name"]]
-                steps = [x for x in rows if not x.get("voidstone")]
-                got = next((x for x in rows if x.get("voidstone")), None)
-                with card(s["name"]):
-                    if s["obtained"]:
-                        head = (f"Obtained {fmt.when(s['when'])}" + (" (likely)" if s["likely"] else "") +
-                                (f" · League Day {int(got['days']) + 1}" if got and got.get("days") is not None else "") +
-                                (f" · {fmt.dur(got['played_s'], True)} play time" if got and got.get("played_s") else ""))
-                    else:
-                        head = f"Not yet · {s['steps_done']} of {s['steps_total']} steps done"
-                    ui.label(head).style("font-size:18px;font-weight:600;color:var(--ex-gold, #d9a441)")
-                    ui.label(f"Dropped by {s['from']}. Requirements, in order:").classes("pt-note q-mb-sm")
-                    table(STONE_COLS, steps, page_size=len(steps) or 1)
-                    note("✓ = defeat line in the log. ✓? = the fight has no defeat line, so leaving the arena alive counts. "
-                         "Attempts = separate arena instances entered; Deaths = deaths in the arena. Steps and lines are in "
-                         "milestones.yaml.")
+    esc = html.escape
+    boxes = ""
+    for i, s in enumerate(vs):
+        rows = [x for x in m["milestones"] if x["group"] == s["name"]]
+        steps = [x for x in rows if not x.get("voidstone")]
+        got = next((x for x in rows if x.get("voidstone")), None)
+        if s["obtained"]:
+            head = (f"Obtained {fmt.when(s['when'])}" + (" (likely)" if s["likely"] else ""))
+            extra = " · ".join(x for x in (
+                f"League Day {int(got['days']) + 1}" if got and got.get("days") is not None else "",
+                f"{fmt.dur(got['played_s'], True)} play time" if got and got.get("played_s") else "") if x)
+        else:
+            head, extra = f"{s['steps_done']} of {s['steps_total']} steps done", ""
+        pct = (s["steps_done"] / s["steps_total"]) if s["steps_total"] else (1.0 if s["obtained"] else 0.0)
+        items = ""
+        for st in steps:
+            done = bool(st.get("done"))
+            mark = ("✓?" if st.get("likely") else "✓") if done else "○"
+            name = st["name"] + (f" · {st['detail']}" if st.get("detail") else "")
+            bits = [b for b in (
+                f"{st['attempts']} attempt{'s' if st['attempts'] != 1 else ''}" if st.get("attempts") else "",
+                f"{st['deaths']} death{'s' if st['deaths'] != 1 else ''}" if st.get("deaths") else "") if b]
+            when = (fmt.when(st["ts_utc"]) + (f" · Day {int(st['days']) + 1}" if st.get("days") is not None else "")
+                    if done else "not yet")
+            items += (f'<div class="pt-step{" done" if done else ""}">'
+                      f'<span class="mk">{mark}</span>'
+                      f'<span class="nm">{esc(name)}<small>{esc(when)}</small></span>'
+                      f'<span class="ad">{esc(" · ".join(bits))}</span></div>')
+        boxes += (f'<div id="stone-box-{i}" class="pt-card pt-stonebox{" got" if s["obtained"] else ""}">'
+                  f'<div class="hd"><span class="bx">{"☑" if s["obtained"] else "☐"}</span>'
+                  f'<span class="tt">{esc(s["name"])}</span></div>'
+                  f'<div class="st">{esc(head)}</div>'
+                  f'<div class="pt-note" style="font-size:12.5px">{esc(extra + " · " if extra else "")}'
+                  f'Dropped by {esc(s["from"] or "?")}</div>'
+                  f'<div class="bar"><i style="width:{pct * 100:.0f}%"></i></div>'
+                  f'{items or "<div class=pt-note>No steps listed.</div>"}</div>')
+    ui.html(f'<div class="pt-stonegrid">{boxes}</div>').classes("w-full")
+    note("✓ = defeat line in the log. ✓? = the fight has no defeat line, so leaving the arena alive counts. "
+         "Attempts = separate arena instances entered; deaths = deaths in the arena. Steps and lines are in milestones.yaml.")
 
 
-def _mapping_checklist(lg: str, m: dict) -> None:
+def _map_tick(lg: str, name: str, value: bool, log_ts: str | None) -> None:
+    """Save a hand tick/untick; matching what the log says clears the override."""
     from datetime import datetime, timezone
-    checks = STATE.pref("map_checks") or {}
-    manual = checks.get(lg) or {}
+    allc = STATE.pref("map_checks") or {}
+    mine = dict(allc.get(lg) or {})
+    if value == bool(log_ts):
+        mine.pop(name, None)
+    else:
+        mine[name] = [value, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")]
+    allc[lg] = mine
+    STATE.set_pref("map_checks", allc)
+
+
+def _mapping_checklist(lg: str, m: dict, holder: dict) -> None:
+    manual = (STATE.pref("map_checks") or {}).get(lg) or {}
     until = (m.get("ended") or {}).get("ts_utc")
     ck = STATE.cached(("mapcheck", lg, json_key(manual), until), lambda c: metrics.map_checklist(c, lg, manual, until), league=lg)
-    show = STATE.pref("map_filter", "all")
+    holder["ran"] = {i["name"]: i["ran_utc"] for i in ck["maps"] + ck["uniques"]}
+    esc = html.escape
 
-    def toggle(name: str, value: bool, log_ts: str | None, sub, counter, kind):
-        allc = STATE.pref("map_checks") or {}
-        mine = dict(allc.get(lg) or {})
-        if value == bool(log_ts):
-            mine.pop(name, None)            # back to what the log says
-            txt = _check_sub(value, log_ts, "log" if log_ts else None, log_ts)
-        else:
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            mine[name] = [value, now]
-            txt = _check_sub(value, now if value else None, "manual", log_ts)
-        allc[lg] = mine
-        STATE.set_pref("map_checks", allc)
-        sub.set_text(txt)
-        counter["n"] += 1 if value else -1
-        counter["label"].set_text(f"{kind} · {counter['n']} of {counter['total']}")
+    def chips(title: str, items: list[dict]) -> None:
+        n = sum(i["done"] for i in items)
+        body = "".join(
+            f'<button type="button" class="pt-mapchip{" on" if i["done"] else ""}" data-name="{esc(i["name"])}" '
+            f'title="{esc(i["name"] + " · " + _check_sub(i["done"], i["ts_utc"], i["how"], i["ran_utc"], i["tier"]))}">'
+            f'{esc(i["name"].removesuffix(" Map"))}</button>' for i in items)
+        pct = n / len(items) * 100 if items else 0
+        ui.html(f'<div class="pt-card pt-chipbox" data-total="{len(items)}">'
+                f'<div class="pt-h2" style="display:flex;gap:10px;align-items:baseline">{esc(title)}'
+                f'<span class="pt-chipcount" style="color:var(--ex-gold, #d9a441)">{n} of {len(items)}</span>'
+                f'<span class="pt-note" style="font-size:12px;font-weight:400">{pct:.0f}%</span></div>'
+                f'<div class="pt-chips">{body}</div></div>').classes("w-full")
 
-    def grid(title: str, items: list[dict], kind: str):
-        with ui.element("div").classes("pt-card w-full"):
-            counter = {"n": sum(i["done"] for i in items), "total": len(items)}
-            counter["label"] = ui.label(f"{title} · {counter['n']} of {counter['total']}").classes("pt-h2")
-            vis = [i for i in items if show == "all" or (show == "todo") != i["done"]]
-            if not vis:
-                ui.label("Nothing here with this filter.").classes("pt-note")
-            with ui.element("div").classes("w-full").style(
-                    "display:grid;gap:2px 12px;grid-template-columns:repeat(auto-fill, minmax(190px, 1fr))"):
-                for it in vis:
-                    with ui.row().classes("items-start no-wrap gap-1").style("min-width:0"):
-                        cb = ui.checkbox(value=it["done"]).props("dense size=sm color=primary").classes("q-mt-xs")
-                        with ui.column().classes("gap-0").style("min-width:0"):
-                            ui.label(it["name"]).classes("text-weight-medium").style(
-                                "font-size:14px;line-height:1.25;overflow-wrap:anywhere" +
-                                (";color:var(--ex-gold, #d9a441)" if it["done"] else ""))
-                            sub = ui.label(_check_sub(it["done"], it["ts_utc"], it["how"], it["ran_utc"], it["tier"])).classes(
-                                "pt-note").style("font-size:11.5px;line-height:1.2")
-                        cb.on_value_change(lambda e, it=it, sub=sub: toggle(it["name"], e.value, it["ran_utc"], sub, counter, title))
-
-    with ui.row().classes("w-full items-center gap-3"):
-        ui.toggle({"all": "All", "todo": "To Do", "done": "Done"}, value=show,
-                  on_change=lambda e: (STATE.set_pref("map_filter", e.value), _refresh_page())).props(
-            "dense no-caps unelevated toggle-color=primary text-color=grey-5")
-        ui.label(("Only maps run before league start ended count. " if until else "") +
-                 "Ticked automatically the first time any of your characters in this league enters the map. "
-                 "Tick or untick by hand to correct it (say, for the Atlas bonus).").classes("pt-note").style("flex:1 1 260px")
-    grid("Atlas Maps", ck["maps"], "maps")
+    note(("Only maps run before league start ended count. " if until else "") +
+         "Gold maps are done: ticked the first time any of your characters in this league enters them. "
+         "Click a map to tick or untick it by hand (say, for an Atlas bonus); hover for the date.")
+    chips("Atlas Maps", ck["maps"])
     if not ck["has_pool"]:
         note("This league's map pool isn't built in, so this lists the maps you ran.")
-    grid("Unique Maps", ck["uniques"], "uniques")
-    note("Replica maps use the same area as the original, so they share its row.")
+    chips("Unique Maps", ck["uniques"])
+    note("Replica maps use the same area as the original, so they share its chip.")
 
     atlas = [x for x in m["milestones"] if x["group"] == "Atlas"]
-    char = [x for x in m["milestones"] if x["group"] in ("Character", "Labyrinth")]
     with card("Atlas Milestones"):
         table(MS_COLS, atlas, page_size=len(atlas))
-    with card("Character and Labyrinth"):
-        table(BOSS_COLS, char, page_size=len(char))
 
 
 def _check_sub(done: bool, ts: str | None, how: str | None, ran: str | None, tier=None) -> str:
@@ -1088,13 +1091,13 @@ def json_key(d: dict) -> str:
 
 
 def _refresh_page() -> None:
-    ui.navigate.reload()
+    reload_page()
 
 
-@ui.page("/character")
+@route("/character")
 def character_page():
-    if (r := locked("/character")):
-        return r
+    if locked("/character"):
+        return
     lg = STATE.league()
     body = frame("/character", "Characters", lg or "", lambda: league_select(_reload))
     chars = STATE.characters(lg)
@@ -1192,10 +1195,10 @@ def character_page():
 
 
 # ====================================================================== Atlas
-@ui.page("/atlas")
+@route("/atlas")
 def atlas_page():
-    if (r := locked("/atlas")):
-        return r
+    if locked("/atlas"):
+        return
     lg = STATE.league()
     body = frame("/atlas", "Atlas tree", lg or "", lambda: league_select(_reload))
 
@@ -1243,10 +1246,10 @@ def atlas_page():
 DEFAULT_ITEMS = ["Divine Orb", "Chaos Orb", "Exalted Orb", "Orb of Annulment", "Mirror Shard"]
 
 
-@ui.page("/currency")
+@route("/currency")
 def currency_page():
-    if (r := locked("/currency")):
-        return r
+    if locked("/currency"):
+        return
     lg = STATE.league()
     body = frame("/currency", "Currency", lg or "", lambda: league_select(_reload))
 
@@ -1357,10 +1360,10 @@ def currency_page():
 
 
 # ====================================================================== Trades
-@ui.page("/trades")
+@route("/trades")
 def trades_page():
-    if (r := locked("/trades")):
-        return r
+    if locked("/trades"):
+        return
     lg = STATE.league()
     body = frame("/trades", "Trades", lg or "", lambda: league_select(_reload))
 
@@ -1401,7 +1404,7 @@ def trades_page():
 
 
 # ====================================================================== Standard
-@ui.page("/standard")
+@route("/standard")
 def standard_page():
     lg = STATE.league()
     body = frame("/standard", "Standard", "Every league combined, and how one league compares with the rest",
@@ -1518,7 +1521,7 @@ def standard_page():
 
 
 # ====================================================================== Settings
-@ui.page("/settings")
+@route("/settings")
 def settings_page():
     body = frame("/settings", "Settings", "Saved to settings.yaml in your config folder")
     from .. import paths
@@ -1608,7 +1611,7 @@ def settings_page():
                         hk_in.set_value(v)
                         rec_btn.set_text("Record")
                         ui.notify(f"Got {v}. Press Save, then reopen the mini tracker.")
-                ui.on("hk_rec", recorded)
+                on_event("hk_rec", recorded)
 
                 def record():
                     rec_btn.set_text("Press keys…")

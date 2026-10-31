@@ -201,6 +201,31 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-head-tabs .q-tab .q-focus-helper { display: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--ex-bg-2); }
 ::-webkit-scrollbar-thumb { background: var(--ex-line); border: 2px solid var(--ex-bg-2); border-radius: 6px; }
+/* league start mapping: one box per voidstone */
+.pt-stonegrid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); }
+.pt-stonebox { padding: 16px 18px; min-width: 0; scroll-margin-top: 90px; }
+.pt-stonebox .hd { display: flex; gap: 10px; align-items: center; }
+.pt-stonebox .bx { font-size: 22px; line-height: 1; color: var(--ex-muted); }
+.pt-stonebox .tt { font-family: 'Cinzel', serif; font-weight: 700; font-size: 16px; color: var(--ex-text); }
+.pt-stonebox.got .bx, .pt-stonebox.got .tt { color: var(--ex-gold-hi); }
+.pt-stonebox .st { font-size: 15px; font-weight: 600; color: var(--ex-gold); margin: 6px 0 2px; }
+.pt-stonebox .bar { height: 5px; background: #2d2722; border-radius: 3px; overflow: hidden; margin: 10px 0 8px; }
+.pt-stonebox .bar i { display: block; height: 100%; background: var(--ex-gold); }
+.pt-step { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: baseline;
+  padding: 6px 0; border-top: 1px solid var(--ex-line-dim, #2d2722); font-size: 13.5px; color: var(--ex-muted); }
+.pt-step .mk { text-align: center; font-weight: 700; }
+.pt-step .nm { min-width: 0; overflow-wrap: anywhere; }
+.pt-step .nm small { display: block; font-size: 11.5px; color: var(--ex-dim, #6f665a); }
+.pt-step .ad { font-size: 11.5px; color: var(--ex-dim, #6f665a); white-space: nowrap; }
+.pt-step.done { color: var(--ex-text); } .pt-step.done .mk { color: var(--ex-gold); }
+/* map checklist: one chip per map, gold when done */
+.pt-chipbox { padding: 14px 16px; }
+.pt-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.pt-mapchip { font: inherit; font-size: 12.5px; line-height: 1; padding: 6px 9px; border-radius: 3px; cursor: pointer;
+  background: rgba(0,0,0,.2); color: var(--ex-dim, #6f665a); border: 1px dashed #4a4038; transition: background .12s, color .12s; }
+.pt-mapchip:hover { border-color: var(--ex-gold); color: var(--ex-text); }
+.pt-mapchip.on { background: rgba(201,163,90,.24); color: var(--ex-gold-hi); border: 1px solid rgba(201,163,90,.55); }
+.pt-mapchip.on:hover { background: rgba(201,163,90,.34); }
 """
 
 

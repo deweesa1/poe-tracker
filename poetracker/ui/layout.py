@@ -180,13 +180,13 @@ def is_open(path: str) -> bool:
     return path in OPEN_IN.get(st["phase"], {path})
 
 
-def locked(path: str):
-    """Call first thing in a page: returns a redirect when that page is
-    hidden during league start."""
+def locked(path: str) -> bool:
+    """Call first thing in a page: when the page is hidden during league start,
+    go to the page that's open instead and return True."""
     if is_open(path):
-        return None
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(PHASE_PAGE.get(league_start()["phase"], "/"))
+        return False
+    ui.navigate.to(PHASE_PAGE.get(league_start()["phase"], "/"))
+    return True
 
 
 def status_text() -> tuple[str, str, str]:
@@ -226,8 +226,12 @@ def version_line() -> tuple[str, str, bool]:
     return (f"Version {short or '?'} · up to date", when, False)
 
 
-def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):
-    """Draw the shared layout. Returns the content column to fill."""
+def build_shell() -> None:
+    """The parts every page shares (side menu, top bar), built once per window.
+    Pages are swapped inside it without reloading (see frame())."""
+    client = ui.context.client
+    pt: dict = {}
+    client.pt = pt
     ui.add_css(CSS)
     exile = (STATE.cfg.settings.get("theme") if STATE.cfg else "exile") != "classic"
     primary = "#d9a441"
@@ -268,11 +272,16 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             ui.html('<img src="/static/icon.svg" alt="" style="width:30px;height:30px;display:block;'
                     'filter:drop-shadow(0 0 6px rgba(217,164,65,.35))">')
             ui.label("PoE Tracker").classes("text-weight-bold q-mini-drawer-hide")
-        ls = league_start()
-        with ui.list().classes("pt-nav w-full"):
-            for href, label, icon in NAV:
-                if is_open(href):
-                    nav_item(label, icon, lambda h=href: ui.navigate.to(h), active=href == path)
+        nav_list = ui.list().classes("pt-nav w-full")
+
+        def draw_nav(path: str) -> None:
+            nav_list.clear()
+            with nav_list:
+                for href, label, icon in NAV:
+                    if is_open(href):
+                        nav_item(label, icon, lambda h=href: ui.navigate.to(h), active=href == path)
+            settings_item.classes(add="active") if path == SETTINGS[0] else settings_item.classes(remove="active")
+        pt["draw_nav"] = draw_nav
         ui.space()
         with ui.column().classes("w-full gap-0 q-pt-sm pt-drawer-foot"):
             with ui.list().classes("pt-nav w-full"):
@@ -281,7 +290,7 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
             ui.element("div").classes("pt-sep")
             with ui.list().classes("pt-nav w-full"):
                 href, label, icon = SETTINGS
-                nav_item(label, icon, lambda: ui.navigate.to(href), active=href == path).classes("pt-has-toggle")
+                settings_item = nav_item(label, icon, lambda: ui.navigate.to(href)).classes("pt-has-toggle")
             ver_box = ui.element("div").classes("pt-ver")
 
             def draw_version():
@@ -328,14 +337,10 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
     with ui.header().classes("items-center no-wrap q-px-lg q-py-sm gap-4 pt-header"):
         # title and page tabs on one line, so every page's top bar is the same height
         with ui.row().classes("items-center no-wrap pt-head").style("gap:28px"):
-            t = ui.label(title).classes("pt-title")
-            if subtitle:
-                t.tooltip(subtitle)
-            ui.context.client.pt_tabs_slot = ui.row().classes("pt-head-tabs")
+            pt["title"] = ui.label("").classes("pt-title")
+            client.pt_tabs_slot = ui.row().classes("pt-head-tabs")
         ui.space()
-        if filters:
-            with ui.row().classes("items-center gap-3"):
-                filters()
+        pt["filters"] = ui.row().classes("items-center gap-3 no-wrap")
         status = ui.row().classes("items-center gap-2 text-xs").style("color:var(--muted)")
 
         def draw_status():
@@ -366,7 +371,61 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
         draw_status()
         ui.timer(5, draw_status)
 
+    # one listener per window for events the pages raise from the browser
+    client.pt_events = {}
+    ui.add_body_html("""<script>
+document.addEventListener("click", (e) => {
+  const a = e.target.closest(".pt-actbar a");
+  if (a) { e.preventDefault(); emitEvent("act_jump", a.getAttribute("href").split("-").pop()); return; }
+  const s = e.target.closest("a.pt-stone");
+  if (s) { e.preventDefault(); emitEvent("stone_jump", s.dataset.i); return; }
+  const m = e.target.closest(".pt-mapchip");
+  if (m) {                       // flip at once; the server saves it
+    const on = !m.classList.contains("on");
+    m.classList.toggle("on", on);
+    m.title = m.dataset.name + (on ? " · ticked by you just now" : " · unticked by you");
+    const box = m.closest(".pt-chipbox"), c = box && box.querySelector(".pt-chipcount");
+    if (c) c.textContent = box.querySelectorAll(".pt-mapchip.on").length + " of " + box.dataset.total;
+    emitEvent("map_toggle", [m.dataset.name, on]);
+  }
+});
+</script>""")
+
+
+def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = None):
+    """Show a page inside the shared layout: set the title, filters and menu
+    highlight, and return the column to fill. Switching pages only rebuilds
+    this part, so it's quick."""
+    client = ui.context.client
+    pt = client.pt
+    pt["title"].set_text(title)
+    pt["title"].props(f'title="{subtitle}"' if subtitle else 'title=""')
+    client.pt_tabs_slot.clear()
+    pt["filters"].clear()
+    if filters:
+        with pt["filters"]:
+            filters()
+    pt["draw_nav"](path)
     return ui.column().classes("w-full q-pa-lg gap-4").style("max-width:1500px")
+
+
+def on_event(name: str, handler: Callable) -> None:
+    """Handle a browser event (emitEvent) on the current page. Registered once per
+    window; each page visit just swaps the handler."""
+    client = ui.context.client
+    events = client.pt_events
+    if name not in events:
+        ui.on(name, lambda e, n=name: events[n](e) if events.get(n) else None)
+    events[name] = handler
+
+
+def reload_page() -> None:
+    """Rebuild the current page (after a filter changes), without reloading the window."""
+    sub = getattr(ui.context.client, "pt_sub", None)
+    if sub is not None:
+        sub.refresh()
+    else:
+        ui.navigate.reload()
 
 
 def head_tabs(value: str, tabs: dict, on_change: Callable) -> ui.tabs:

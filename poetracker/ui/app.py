@@ -51,6 +51,15 @@ def run(window: str | None = None, port: int | None = None, dev: bool = False) -
     app.add_static_files("/static", str(paths.PACKAGE_DIR / "ui" / "static"))
     from . import pages  # noqa: F401  (registers the pages)
     from . import mini_page  # noqa: F401  (the mini window's page)
+    from . import layout
+
+    # One window, many pages: the side menu and top bar are built once and the
+    # pages are swapped inside them (no full reload when you switch pages).
+    @ui.page("/")
+    @ui.page("/{_:path}")
+    def index():
+        layout.build_shell()
+        ui.context.client.pt_sub = ui.sub_pages(pages.ROUTES).classes("w-full")
     pages.start_warmup()
 
     window = window or cfg.settings.get("window") or "native"

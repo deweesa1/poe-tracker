@@ -1385,7 +1385,6 @@ def mapping_progress(con, config: Config, league: str, status: dict | None = Non
     for label, pred in [("First map", lambda r: True),
                         ("First yellow map (T6)", lambda r: (r["tier"] or 0) >= 6),
                         ("First red map (T11)", lambda r: (r["tier"] or 0) >= 11),
-                        ("First T14 map", lambda r: (r["tier"] or 0) >= 14),
                         ("First T16 map", lambda r: (r["tier"] or 0) >= 16)]:
         r = first_run(pred)
         ms.append({"group": "Atlas", "name": label, **stamp(r["start_utc"] if r else None, r["character_id"] if r else None,
