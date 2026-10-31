@@ -119,14 +119,23 @@ def section(character: str, league: str | None) -> None:
                 "Press Snapshot now to save its gear, jewels and passive tree." if acct else
                 "Add your account name in Settings → Profile Snapshots to take them."))
             return
-        con = STATE.con()
         try:
-            snap = profile.load(con, sel["id"])
-            i = next(k for k, r in enumerate(ok_rows) if r["id"] == sel["id"])
-            prev = profile.load(con, ok_rows[i - 1]["id"]) if i > 0 else None
-        finally:
-            con.close()
-        _show(snap, prev)
+            con = STATE.con()
+            try:
+                snap = profile.load(con, sel["id"])
+                i = next((k for k, r in enumerate(ok_rows) if r["id"] == sel["id"]), 0)
+                prev = profile.load(con, ok_rows[i - 1]["id"]) if i > 0 else None
+            finally:
+                con.close()
+            with ui.column().classes("w-full gap-2"):
+                _show(snap, prev)
+        except Exception as e:                     # show what went wrong instead of a blank card
+            import logging
+            import traceback
+            logging.getLogger(__name__).exception("showing profile snapshot failed")
+            tb = traceback.extract_tb(e.__traceback__)[-1]
+            ui.label(f"Couldn't show this snapshot: {type(e).__name__}: {e} "
+                     f"({tb.name}, line {tb.lineno})").classes("pt-note").style("color:#e06050")
 
     watch = {"since": None}
 
