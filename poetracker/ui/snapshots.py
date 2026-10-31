@@ -24,13 +24,26 @@ def _item_name(it: dict) -> str:
     return n or it.get("baseType") or "?"
 
 
+def _mod_text(m) -> str:
+    """A mod line; some kinds come as objects instead of plain text."""
+    if isinstance(m, str):
+        return m
+    if isinstance(m, dict):
+        for k in ("text", "name", "description", "mod"):
+            if isinstance(m.get(k), str):
+                return m[k]
+        return " ".join(str(v) for v in m.values() if isinstance(v, (str, int, float)))
+    return str(m)
+
+
 def _mods_tip(it: dict) -> str:
     lines = []
-    for key in ("enchantMods", "implicitMods", "fracturedMods", "explicitMods", "craftedMods"):
-        lines += it.get(key) or []
+    for key in ("enchantMods", "implicitMods", "fracturedMods", "explicitMods", "craftedMods", "mutatedMods",
+                "crucibleMods", "veiledMods", "scourgeMods", "runeMods", "desecratedMods"):
+        lines += [_mod_text(m) for m in (it.get(key) or []) if m]
     if it.get("corrupted"):
         lines.append("Corrupted")
-    return "\n".join(lines)
+    return "\n".join(x for x in lines if x)
 
 
 def _gems(it: dict) -> list[str]:
