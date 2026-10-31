@@ -60,6 +60,12 @@ html {{ scroll-behavior: smooth; }}
   .q-table--dense th, .q-table--dense td {{ padding-left: 6px !important; padding-right: 6px !important; }}
   .q-table td, .q-table th {{ font-size: 12.5px; }}
 }}
+.pt-ls-head {{ font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ex-gold, #d9a441); margin-bottom: 2px; }}
+.pt-ver {{ align-self: stretch; margin: 10px 14px 14px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--ex-line-dim, #2d2722);
+  background: rgba(0,0,0,.18); }}
+.pt-stat {{ display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border-radius: 50%; border: 1px solid var(--ex-line-dim, #2d2722); background: rgba(0,0,0,.18); cursor: default; }}
 .pt-actbar a:hover > div {{ filter: brightness(1.15); box-shadow: 0 0 0 1px #ece4d8 inset; }}
 .pt-wrap {{ flex-wrap: wrap; }}
 .pt-wrap > * {{ flex: 1 1 420px; min-width: 0; }}

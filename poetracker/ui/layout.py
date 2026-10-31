@@ -200,8 +200,8 @@ def status_text() -> tuple[str, str, str]:
             "something the tracker uses (entering an area, a level-up, a death...).")
 
 
-STATUS_ICON = {"ok": ("auto_stories", "var(--ex-gold, #d9a441)"), "busy": ("hourglass_top", "#e0a050"),
-               "problem": ("report", "#e06050")}
+STATUS_ICON = {"ok": ("o_menu_book", "var(--ex-gold, #c9a35a)"), "busy": ("o_hourglass_top", "#e0a050"),
+               "problem": ("o_report", "#e06050")}
 
 
 def version_line() -> tuple[str, str, bool]:
@@ -249,29 +249,33 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     with ui.item_section().props("avatar").style("min-width:34px"):
                         ui.icon(icon, size="20px")
                     ui.item_section(label).style("white-space:nowrap")
-        with ui.column().classes("q-px-md q-pt-md gap-1 w-full"):
-            ui.button("Mini Tracker", icon="picture_in_picture_alt", on_click=open_mini).props(
-                "outline no-caps").classes("w-full pt-mini-btn").tooltip("A small always-on-top window for live tracking")
         if ls["phase"] in PHASE_PAGE:
-            text = ("Campaign · finish Act 10 to open League Start Mapping" if ls["phase"] == "campaign" else
-                    f"Mapping · {ls['voidstones']} of {ls['voidstones_total']} Voidstones. All four open the other dashboards")
-            chars = [f"Campaign: {ls['campaign_name']}" if ls.get("campaign_name") else None,
-                     f"Mapping: {ls['mapping_name']}" if ls.get("mapping_name") else None]
-            with ui.column().classes("q-px-md q-pt-md gap-1"):
-                ui.label("League start").classes("text-xs text-weight-bold").style("color:#d9a441;letter-spacing:.06em;text-transform:uppercase")
-                ui.label(text).classes("pt-note").style("font-size:12px;line-height:1.35")
-                for c in chars:
-                    if c:
-                        ui.label(c).classes("pt-note").style("font-size:12px;color:#ece4d8")
+            prog = ("Campaign phase" if ls["phase"] == "campaign" else
+                    f"Mapping · {ls['voidstones']}/{ls['voidstones_total']} Voidstones")
+            with ui.column().classes("q-px-md q-pt-lg gap-0 w-full"):
+                ui.label("League start").classes("pt-ls-head")
+                ui.label(prog).style("font-size:12.5px;color:var(--ex-gold-hi, #e6c27a);margin-bottom:4px")
+                for k, v in (("Campaign", ls.get("campaign_name")), ("Mapping", ls.get("mapping_name"))):
+                    if v:
+                        with ui.row().classes("w-full no-wrap gap-2 items-baseline"):
+                            ui.label(k).classes("pt-note").style("font-size:11px;width:54px;flex:none")
+                            ui.label(v).style("font-size:12.5px;color:var(--ex-text, #ece4d8);overflow:hidden;"
+                                              "text-overflow:ellipsis;white-space:nowrap")
         ui.space()
-        with ui.column().classes("w-full gap-1 q-pb-md q-pt-sm").style("border-top:1px solid var(--ex-line-dim, #2d2722)"):
+        with ui.column().classes("w-full gap-0 q-pt-sm").style("border-top:1px solid var(--ex-line-dim, #2d2722)"):
             with ui.list().classes("pt-nav w-full"):
+                with ui.item(on_click=open_mini).tooltip("A small always-on-top window with your live timer"):
+                    with ui.item_section().props("avatar").style("min-width:34px"):
+                        ui.icon("picture_in_picture_alt", size="20px")
+                    ui.item_section("Mini Tracker").style("white-space:nowrap")
+                    with ui.item_section().props("side"):
+                        ui.icon("open_in_new", size="15px").style("color:var(--ex-dim, #6f665a)")
                 href, label, icon = SETTINGS
                 with ui.item(on_click=lambda: ui.navigate.to(href)).classes("active" if href == path else ""):
                     with ui.item_section().props("avatar").style("min-width:34px"):
                         ui.icon(icon, size="20px")
                     ui.item_section(label).style("white-space:nowrap")
-            ver_box = ui.row().classes("w-full q-px-md items-center no-wrap gap-2")
+            ver_box = ui.element("div").classes("pt-ver")
 
             def draw_version():
                 text, tip, ready = version_line()
@@ -280,10 +284,17 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                     if ready:
                         ui.button(text, icon="system_update", on_click=update_dialog).props(
                             "dense unelevated no-caps size=sm color=primary text-color=dark").classes("w-full").tooltip(tip)
-                    else:
-                        ui.icon("verified" if "up to date" in text else "info", size="15px").style(
-                            "color:var(--ex-muted, #a69b8c)")
-                        ui.label(text).classes("pt-note").style("font-size:11.5px;line-height:1.3").tooltip(tip)
+                        return
+                    head, _, state = text.partition(" · ")
+                    ok = "up to date" in state
+                    with ui.row().classes("items-center no-wrap gap-2 w-full").tooltip(tip):
+                        ui.icon("o_verified" if ok else "o_info", size="16px").style(
+                            f"color:{'var(--ex-gold, #c9a35a)' if ok else 'var(--ex-muted, #a69b8c)'}")
+                        with ui.column().classes("gap-0"):
+                            ui.label(head).style("font-size:11.5px;color:var(--ex-text, #ece4d8);line-height:1.25")
+                            if state:
+                                ui.label(state.capitalize()).style("font-size:10.5px;color:var(--ex-muted, #a69b8c);"
+                                                                   "line-height:1.25")
             draw_version()
             ui.timer(10, draw_version)
 
@@ -308,15 +319,20 @@ def frame(path: str, title: str, subtitle: str = "", filters: Callable | None = 
                              color="deep-orange").props("outline").tooltip(
                         "Developer mode. League Start can be forced in Settings → Developer.")
                 icon, col = STATUS_ICON[color]
-                ui.icon(icon, size="16px").style(f"color:{col}")
-                lbl = ui.label(text)
-                if tip:
-                    lbl.tooltip(tip)
+                with ui.element("div").classes("pt-stat"):
+                    ui.icon(icon, size="18px").style(f"color:{col}")
+                    with ui.tooltip().classes("text-body2"):
+                        ui.label(text).classes("text-weight-medium")
+                        if tip:
+                            ui.label(tip).style("max-width:280px;opacity:.85")
+                clip_on = bool(STATE.tracker and STATE.tracker.status().get("clipboard"))
+                with ui.element("div").classes("pt-stat"):
+                    ui.icon("o_content_paste", size="18px").style(
+                        f"color:{'var(--ex-gold, #c9a35a)' if clip_on else 'var(--ex-dim, #6f665a)'}")
+                    ui.tooltip("Map capture is on: Ctrl+C on a map in game saves it (Maps → Detailed Maps)."
+                               if clip_on else "Map capture is off (Settings → General).").classes("text-body2")
                 if STATE.updater:
                     STATE.updater.check_soon()          # while the window is open, at most every 90 s
-                if STATE.tracker and STATE.tracker.status().get("clipboard"):
-                    ui.icon("content_paste", size="16px").tooltip(
-                        "Map capture is on: Ctrl+C on a map in game saves it (see Maps → Detailed Maps).")
 
         draw_status()
         ui.timer(5, draw_status)
