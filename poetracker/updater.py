@@ -62,6 +62,31 @@ def _http(url: str, timeout: float = 30, raw: bool = False):
     return data if raw else json.loads(data.decode("utf-8"))
 
 
+_HEAD: dict = {"etag": None, "sha": None}
+
+
+def _head_sha(repo: str) -> str:
+    """The newest commit on the branch, asked cheaply: GitHub answers "not
+    modified" when nothing changed, and those answers don't count against the
+    60-an-hour limit, so the tracker can ask every minute."""
+    import urllib.error
+    import urllib.request
+    headers = {"User-Agent": "poe-tracker-updater", "Accept": "application/vnd.github.sha"}
+    if _TOKEN["value"]:
+        headers["Authorization"] = f"Bearer {_TOKEN['value']}"
+    if _HEAD["etag"] and _HEAD["sha"]:
+        headers["If-None-Match"] = _HEAD["etag"]
+    req = urllib.request.Request(f"https://api.github.com/repos/{repo}/commits/{BRANCH}", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            _HEAD["sha"] = r.read().decode().strip()
+            _HEAD["etag"] = r.headers.get("ETag")
+    except urllib.error.HTTPError as e:
+        if e.code != 304:
+            raise
+    return _HEAD["sha"]
+
+
 def blob_sha(data: bytes) -> str:
     """Git's fingerprint of a file's contents (what GitHub lists for every file)."""
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
@@ -103,6 +128,7 @@ class Updater:
                             "version": None, "connected": False, "busy": False, "installed": self.installed,
                             "git": self.installed or bool(shutil.which("git")), "needs_installer": False}
         self._target: str | None = None       # newest commit seen by check()
+        self._backoff_until = 0.0              # GitHub asked us to slow down
         self.state["connected"] = self.connected()
         self.state["version"] = self.version()
 
@@ -195,23 +221,31 @@ class Updater:
             st["version"] = self.version()
             st["connected"] = True            # an installed copy always updates from GitHub
             try:
-                head = _http(f"https://api.github.com/repos/{self.repo}/commits/{BRANCH}")
-                target = head["sha"]
+                if time.time() < self._backoff_until:
+                    st["checked"] = time.time()
+                    return dict(st)
+                target = _head_sha(self.repo)
                 local = self._local_version().get("commit")
-                self._target = target
                 if local == target:
                     st.update(available=False, behind=0, changes=[], error=None)
-                else:
-                    behind, changes = 1, [head["commit"]["message"].splitlines()[0]]
-                    if local:
-                        try:
+                elif target != self._target or not st.get("available"):     # only look up what changed once
+                    behind, changes = 1, []
+                    try:
+                        if local:
                             cmp = _http(f"https://api.github.com/repos/{self.repo}/compare/{local}...{target}")
                             behind = cmp.get("ahead_by") or behind
                             changes = [c["commit"]["message"].splitlines()[0] for c in reversed(cmp.get("commits") or [])]
-                        except Exception:
-                            pass
+                        else:
+                            changes = [_http(f"https://api.github.com/repos/{self.repo}/commits/{target}")
+                                       ["commit"]["message"].splitlines()[0]]
+                    except Exception:
+                        pass
                     st.update(available=True, behind=behind, changes=changes[:15], error=None)
+                self._target = target
             except Exception as e:
+                import urllib.error
+                if isinstance(e, urllib.error.HTTPError) and e.code in (403, 429):
+                    self._backoff_until = time.time() + 600     # hourly limit used up: wait it out
                 st.update(error=_short_error(e))
             st["checked"] = time.time()
             return dict(st)
@@ -286,8 +320,8 @@ class Updater:
 
     def check_soon(self, older_than: float = 90) -> None:
         """Check in the background if the last check is older than this (seconds)."""
-        if self.installed and not _TOKEN["value"]:
-            older_than = max(older_than, 300)     # GitHub allows 60 questions an hour without an account
+        if self.installed:
+            older_than = max(older_than, 60)      # an unchanged answer is free (see _head_sha)
         st = self.state
         if st.get("busy") or self.lock.locked() or (st.get("checked") and time.time() - st["checked"] < older_than):
             return
@@ -295,7 +329,7 @@ class Updater:
 
     def start_background(self, every_minutes: float = 2) -> None:
         if self.installed:
-            every_minutes = max(every_minutes, 5)
+            every_minutes = 1                      # cheap: GitHub says "not modified" without using the hourly limit
 
         def loop():
             time.sleep(20)               # let the tracker finish starting first
