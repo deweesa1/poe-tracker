@@ -397,7 +397,11 @@ def _paperdoll(items: list[dict]) -> str:
         base = it.get("typeLine") or it.get("baseType") or ""
         gems = ", ".join(_gem_label(g) for g in it.get("socketedItems") or [] if not g.get("abyssJewel"))
         icon = it.get("icon") or ""
-        return (f'<div class="pt-inv pt-tipable {extra}" style="grid-area:{area}" data-n="{esc(name or base)}" '
+        inf = it.get("influences") or {}
+        bgk = "Shaper" if (inf.get("shaper") or it.get("shaper")) else "Elder" if (inf.get("elder") or it.get("elder")) else ""
+        bg = (f";background:url(https://web.poecdn.com/image/inventory/{bgk}Background.png?w={it.get('w') or 1}&h={it.get('h') or 1})"
+              f" center / 100% 100% no-repeat, linear-gradient(180deg, #0e1230 0%, #080a1c 100%)" if bgk else "")
+        return (f'<div class="pt-inv pt-tipable {extra}" style="grid-area:{area}{bg}" data-n="{esc(name or base)}" '
                 f'data-b="{esc(base if name else "")}" data-c="{RARITY.get(it.get("frameType"), "#c8c8c8")}" '
                 f'data-tip="{esc(item_card(it, gems))}">'
                 + (f'<img src="{esc(icon)}" alt="" loading="lazy">' if icon else f'<span>{esc(name or base)}</span>')
