@@ -176,6 +176,27 @@ def resistances(items: list[dict]) -> dict:
     return out
 
 
+def resistance_sources(items: list[dict]) -> dict:
+    """{res: [(item name, value, mod line), ...]}: which worn item gives which resistance."""
+    out: dict = {}
+    for it in items:
+        if it.get("inventoryId") in ("Weapon2", "Offhand2", "Flask", "Trinket"):
+            continue
+        r = resistances([it])
+        for k, v in r.items():
+            if v:
+                out.setdefault(k, []).append((_item_name(it), v))
+    return out
+
+
+def _res_tip(res: str, rows: list) -> str:
+    if not rows:
+        return ""
+    lines = "".join(f'<div class="ic-mod expl">{esc(n)}: <b style="color:#e8e2d4">{v:+d}%</b></div>' for n, v in rows)
+    return (f'<div class="ic"><div class="ic-head normal"><div>{esc(res)} resistance</div></div>'
+            f'<div class="ic-body">{lines}</div></div>')
+
+
 def _gems(it: dict) -> list[str]:
     out = []
     for g in it.get("socketedItems") or []:
@@ -366,30 +387,33 @@ def _show(snap: dict | None, prev: dict | None) -> None:
 def _build(snap: dict) -> None:
     """Gear, gear stats, jewels, skills and the passive tree of one snapshot."""
     items = [i for i in snap["items"].get("items") or [] if i.get("inventoryId") in WORN]
-    # ---- gear, jewels and skills
-    with ui.row().classes("w-full gap-5 items-start pt-wrap q-mt-sm"):
-        jewels = (snap.get("passives") or {}).get("items") or []
-        abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
-        with ui.column().classes("gap-3").style("flex:none"):
+    jewels = (snap.get("passives") or {}).get("items") or []
+    abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
+    # ---- gear and its stats on the left; skills on the right, as tall as the left side (scrolls if longer)
+    with ui.element("div").classes("pt-buildgrid w-full q-mt-sm"):
+        with ui.column().classes("gap-3"):
             ui.label("Gear").classes("pt-snaphead")
             ui.html(_paperdoll(items), sanitize=False)
-            dv, rv = defences(items), resistances(items)
-            dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower())
+            dv, rv, src = defences(items), resistances(items), resistance_sources(items)
+            dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower(), "")
                       for k, v in dv.items() if k != "Ward" or v]
-            rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower()) for k, v in rv.items()]
+            rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower(), _res_tip(k, src.get(k) or []))
+                      for k, v in rv.items()]
             row = (lambda cs: f'<div class="pt-def" style="grid-template-columns:repeat({len(cs)}, 1fr)">' + "".join(
-                f'<span class="{c}"><small>{esc(k)}</small>{esc(v)}</span>' for k, v, c in cs) + "</div>")
+                f'<span class="{c}{" pt-tipable" if t else ""}"{f" data-tip={chr(34)}{esc(t)}{chr(34)}" if t else ""}>'
+                f'<small>{esc(k)}</small>{esc(v)}</span>' for k, v, c, t in cs) + "</div>")
             ui.label("Gear Determined Stats").classes("pt-snaphead").tooltip(
                 "Added up from what you're wearing: each item's own defences and resistance mods, before the "
-                "passive tree, the act penalty and other bonuses.")
+                "passive tree, the act penalty and other bonuses. Hover a resistance to see where it comes from.")
             ui.html(row(dcells) + row(rcells))
-            if jewels or abyss:
-                ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead")
-                ui.html(_jewels_html(jewels, abyss))
-        with ui.column().classes("gap-3").style("flex:1 1 420px;min-width:320px"):
+        with ui.column().classes("gap-3 pt-skillcol"):
             ui.label("Skills").classes("pt-snaphead")
-            ui.html(f'<div class="pt-skills">{_skills(items)}</div>' if _skills(items) else
-                    '<div class="pt-note">No gems.</div>').classes("w-full")
+            sk = _skills(items)
+            ui.html(f'<div class="pt-skills">{sk}</div>' if sk else '<div class="pt-note">No gems.</div>').classes(
+                "w-full pt-skillscroll")
+    if jewels or abyss:                      # full width, so any number of jewels sit in a row or two
+        ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead q-mt-md")
+        ui.html(f'<div class="pt-jewelrow">{_jewels_html(jewels, abyss)}</div>').classes("w-full")
 
     # ---- the passive tree, with the ascendancy over it like in game
     if not passive_tree.status()["ready"]:

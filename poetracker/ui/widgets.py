@@ -285,7 +285,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-charhead .cl { font-size: 15px; color: var(--ex-text); margin-top: 2px; }
 .pt-charhead .dt { font-size: 12.5px; color: var(--ex-muted); margin-top: 2px; }
 .pt-charhead .tiles { display: grid; grid-template-columns: repeat(4, minmax(110px, auto)); gap: 0 28px; }
-.pt-charhead .tiles div { display: flex; flex-direction: column; padding-left: 14px; border-left: 1px solid var(--ex-line); }
+.pt-charhead .tiles div { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 14px; border-left: 1px solid var(--ex-line); }
 .pt-charhead .tiles small { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-charhead .tiles b { font-size: 26px; font-weight: 700; color: var(--ex-text); line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pt-charhead .tiles i { font-style: normal; font-size: 12px; color: var(--ex-muted); white-space: nowrap; }
@@ -340,6 +340,12 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-jewel:hover { box-shadow: inset 0 0 8px rgba(0,0,0,.7), 0 0 0 1px var(--rc, #c9a35a); }
 .pt-jewel img { width: 44px; height: 44px; object-fit: contain; }
 /* skills: one card per link group, gems as a chain of linked sockets */
+.pt-buildgrid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.pt-skillcol { min-height: 0; contain: size; overflow: hidden; display: flex; flex-direction: column; }
+.pt-skillscroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
+@media (max-width: 1100px) { .pt-buildgrid { grid-template-columns: 1fr; } .pt-skillcol { contain: none; } }
+.pt-jewelrow .pt-jewels { display: flex; flex-wrap: wrap; width: auto; max-width: none; }
+.pt-jewelrow { display: flex; flex-wrap: wrap; gap: 4px 28px; }
 .pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 10px; width: 100%; }
 .pt-skill { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--ex-line); border-radius: 3px;
   background: linear-gradient(180deg, rgba(20,18,24,.9), rgba(10,9,12,.9)); }
