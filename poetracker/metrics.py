@@ -824,7 +824,29 @@ def boss_progress(con, config: Config, league: str, character_id: int | None = N
             "first_seen": visits[0]["start_utc"] if visits else None,
             "time_in_arena_s": sum(v["active_s"] for v in visits),
         }
+    # The Maven's Crucible: the first four you finish in a league are the quest
+    # invitations that lead to the Maven (3/4/5/6 bosses); every one after that
+    # (Kirac's repeatable 10-boss invitation) only counts as a Crucible ran.
+    if "The Maven's Crucible" in out:
+        # the invitations are Atlas progress, shared by all your characters in the league
+        own = [r[0] for r in con.execute("SELECT id FROM v_own_character WHERE league=?", (league,))] or own
+        q = ",".join("?" * len(own))
+        names = {r[0]: r[1] for r in con.execute(f"SELECT id, name FROM character WHERE id IN ({q})", own)}
+        done = _rows(con, f"""SELECT b.ts_utc, b.character_id, b.visit_id FROM boss_kill b
+                              WHERE b.boss = 'The Maven''s Crucible' AND b.character_id IN ({q}) ORDER BY b.ts_utc""", own)
+        for n in range(1, 5):
+            hit = done[n - 1] if len(done) >= n else None
+            out[crucible_step(n)] = {
+                "boss": crucible_step(n), "attempts": None, "deaths": None, "kills": 1 if hit else 0,
+                "first_kill": {"ts_utc": hit["ts_utc"], "character": names.get(hit["character_id"])} if hit else None,
+                "detected": "dialogue" if hit else None, "count_only": False, "area_name": "The Maven's Crucible",
+            }
+        out["The Maven's Crucible"]["repeat_kills"] = [d["ts_utc"] for d in done[4:]]
     return out
+
+
+def crucible_step(n: int) -> str:
+    return f"Maven's Crucible {n} of 4"
 
 
 def voidstones(con, config: Config, league: str, character_id: int | None = None, bp: dict | None = None) -> dict:
@@ -833,7 +855,10 @@ def voidstones(con, config: Config, league: str, character_id: int | None = None
     lg_start = lg.start.strftime("%Y-%m-%dT%H:%M:%SZ") if lg else None
     stones = []
     for vs in (config.milestones or {}).get("voidstones") or []:
-        steps = [bp.get(s) or {"boss": s, "attempts": 0, "first_kill": None, "count_only": False} for s in vs.get("steps", [])]
+        names_ = []
+        for st_ in vs.get("steps", []):
+            names_ += [crucible_step(n) for n in range(1, 5)] if st_ == "The Maven's Crucible" else [st_]
+        steps = [bp.get(s) or {"boss": s, "attempts": 0, "first_kill": None, "count_only": False} for s in names_]
         req = [bp.get(r) for r in vs.get("requires", [])]
         done = bool(req) and all(r and r["first_kill"] for r in req)
         when = max(r["first_kill"]["ts_utc"] for r in req) if done else None
@@ -1457,6 +1482,7 @@ def mapping_progress(con, config: Config, league: str, status: dict | None = Non
     return {
         "status": status, "milestones": ms, "tiers": tiers, "character_id": mchar, "character": names.get(mchar),
         "entered": entered, "rates": rates, "bar": bar, "voidstones": vs,
+        "crucibles_ran": sum(1 for t_ in (bp.get("The Maven's Crucible") or {}).get("repeat_kills") or [] if not cut or t_ <= cut),
         "ended": {"ts_utc": cut, "reason": status.get("end_reason")} if cut else None,
         "ends_utc": end if end and not cut else None, "ends_reason": status.get("end_reason"),
         "kpis": {
@@ -1586,7 +1612,10 @@ def mini_status(con, config: Config, league: str | None = None, force_phase: str
         rows = [x for x in m["milestones"] if x["group"] == s_["name"]]
         got = next((x for x in rows if x.get("voidstone")), {})
         stones.append({"name": s_["name"].replace(" Voidstone", ""), "done": s_["obtained"], "t": clock(got),
-                       "steps": [{"name": x["name"] + (f" ×{x['kills']}" if (x.get("kills") or 0) > 1 else ""),
+                       "extra": (f"More Crucibles ran ×{m.get('crucibles_ran')}"
+                                 if s_["name"].startswith("Ceremonial") and m.get("crucibles_ran") else None),
+                       "steps": [{"name": x["name"] + (f" ×{x['kills']}" if (x.get("kills") or 0) > 1
+                                                       and not x["name"].startswith("Maven's Crucible") else ""),
                                   "done": x["done"], "t": clock(x), "likely": x.get("likely")}
                                  for x in rows if not x.get("voidstone")]})
     out["mapping"] = {

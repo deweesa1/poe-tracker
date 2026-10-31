@@ -283,6 +283,8 @@ def render(d: dict, live: bool) -> str:
         where = f'Mapping · {_esc(m.get("zone") or "")}{tier}'
 
     def t(v):
+        if v is not None and v < 0:
+            return "before maps"           # done before this character's first map (e.g. on another character)
         return fmt.clock(v) if v is not None else "–"
     stones = ""
     for st in m.get("stones", []):
@@ -292,6 +294,8 @@ def render(d: dict, live: bool) -> str:
             mark = ("✓?" if x.get("likely") else "✓") if x["done"] else "○"
             stones += (f'<div class="m-step{"" if x["done"] else " todo"}"><span class="k">{mark}</span>'
                        f'<span class="n">{_esc(x["name"])}</span><span class="t">{t(x["t"])}</span></div>')
+        if st.get("extra"):
+            stones += f'<div class="m-step"><span class="k">·</span><span class="n">{_esc(st["extra"])}</span></div>'
     return (f'<div class="m-top"><span class="m-lg">{_esc(m.get("character") or "Mapping")}</span>'
             f'<span class="ch">{_esc(d["league"])}</span></div>'
             f'<div class="m-clock">{clock}</div>'
