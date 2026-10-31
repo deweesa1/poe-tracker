@@ -92,7 +92,7 @@ TICK_JS = """
     document.querySelectorAll('[data-base]').forEach(el => {
       let s = parseFloat(el.dataset.base);
       const a = el.dataset.anchor;
-      if (a && el.dataset.on === '1') s += Math.min((now - Date.parse(a)) / 1000, 600);
+      if (a && el.dataset.on === '1') s += Math.max(0, (now - Date.parse(a)) / 1000);
       el.firstChild ? (el.firstChild.nodeValue = hms(s)) : (el.textContent = hms(s));
     });
   }
@@ -336,7 +336,10 @@ def mini_page():
             age = None
             if st.get("last_event_utc"):
                 age = (datetime.now(timezone.utc) - datetime.fromisoformat(st["last_event_utc"].replace("Z", "+00:00"))).total_seconds()
-            live = age is not None and age < 600
+            # Ticking while the game is running: it writes to Client.txt all the
+            # time, so a log that's been quiet for 15 minutes means it's closed or crashed.
+            quiet = st.get("log_quiet_s")
+            live = (quiet is not None and quiet < 900) or (age is not None and age < 900)
             html = render(data, live)
         j = json.dumps([html])
         if j != last["json"]:

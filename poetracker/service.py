@@ -201,6 +201,8 @@ class Tracker:
         self.clip: captures.ClipboardWatcher | None = None
         self.last_error = None
         self.data_gen = 0          # bumps after a rebuild, so cached results from before are dropped
+        self._log_size = None
+        self.log_active_at = 0.0   # when Client.txt last grew (the game writes to it all the time while running)
 
     def status(self) -> dict:
         """Where reading stands. Pages ask for this many times a second, so the
@@ -231,6 +233,7 @@ class Tracker:
             "last_event_utc": st.get("last_ts"), "captures": caps,
             "clipboard": bool(self.clip and self.clip.is_alive()), "error": self.last_error,
             "now_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "data_gen": self.data_gen,
+            "log_quiet_s": (time.time() - self.log_active_at) if self.log_active_at else None,
         }
 
     def _progress(self, done, total):
@@ -294,6 +297,14 @@ class Tracker:
             if time.time() - last_ckpt > 900:
                 self._checkpoint()
                 last_ckpt = time.time()
+            try:
+                size = os.path.getsize(self.log_path) if self.log_path else None
+                if size != self._log_size:
+                    if self._log_size is not None:
+                        self.log_active_at = time.time()
+                    self._log_size = size
+            except OSError:
+                pass
             if not self.ingestor:
                 self.log_path = find_log(self.cfg)
                 if self.log_path:

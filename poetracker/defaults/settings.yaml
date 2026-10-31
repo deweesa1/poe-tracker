@@ -28,10 +28,6 @@ clipboard_capture: true
 # A copied map is linked to the next map you open within this many minutes.
 capture_link_minutes: 10
 
-# Gaps longer than this inside a session (no log lines at all) are not
-# counted as active play time.
-idle_gap_minutes: 15
-
 # League start mode: during a new league's campaign only the Campaign page is
 # shown (with Overview and Standard), then Mapping until all four Voidstones.
 league_start_mode: true
