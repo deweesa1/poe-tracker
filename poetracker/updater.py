@@ -67,6 +67,13 @@ def blob_sha(data: bytes) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
+def file_sha(data: bytes) -> tuple[str, str]:
+    """A file's fingerprint as stored, and with Windows line endings (CRLF) turned
+    into LF the way Git stores text files. A file matches GitHub's if either does."""
+    raw = blob_sha(data)
+    return raw, (blob_sha(data.replace(b"\r\n", b"\n")) if b"\r\n" in data else raw)
+
+
 def _local_files() -> dict[str, Path]:
     """The app files in this copy, by their path in the repo."""
     out = {}
@@ -218,14 +225,17 @@ class Updater:
                 if not remote:
                     return False, "GitHub sent an empty file list; try again later."
                 local = _local_files()
-                hashes = {p: blob_sha(f.read_bytes()) for p, f in local.items()}
-                if remote.get("requirements.txt") and hashes.get("requirements.txt") != remote["requirements.txt"]:
+                hashes = {p: file_sha(f.read_bytes()) for p, f in local.items()}
+
+                def same(p):
+                    return remote[p] in hashes.get(p, ())
+                if remote.get("requirements.txt") and not same("requirements.txt"):
                     # new Python packages: the installer brings those, a file update can't
                     self.state["needs_installer"] = True
                     return False, ("This update needs new Python packages, so it comes as a new installer. Download "
                                    f"PoE Tracker Setup.exe from https://github.com/{self.repo}/releases/latest and run "
                                    "it; your data is kept.")
-                todo = [p for p, sha in remote.items() if hashes.get(p) != sha]
+                todo = [p for p in remote if not same(p)]
                 staged: dict[str, bytes] = {}
                 for p in todo:
                     from urllib.parse import quote

@@ -23,6 +23,9 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      # keep files byte-for-byte as in the repo (no CRLF), so the app's update
+      # check sees them as identical to GitHub's
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
