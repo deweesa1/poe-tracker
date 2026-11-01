@@ -224,9 +224,9 @@
 // weapon set I / II on a snapshot's inventory
 document.addEventListener("click", (e) => {
   const b = e.target.closest(".pt-swap button"); if (!b) return;
-  const doll = b.closest(".pt-paperdoll");
-  doll.classList.toggle("alt", b.dataset.set === "2");
-  doll.querySelectorAll(".pt-swap button").forEach((x) => x.classList.toggle("on", x === b));
+  const gear = b.closest(".pt-geardoll");
+  gear.querySelector(".pt-paperdoll").classList.toggle("alt", b.dataset.set === "2");
+  gear.querySelectorAll(".pt-swap button").forEach((x) => x.classList.toggle("on", x === b));
 });
 
 // character picker: arrows scroll the row; the mouse wheel scrolls it sideways
@@ -247,14 +247,14 @@ window.addEventListener("resize", ptFitRows);
 const ptSockPref = () => { try { return localStorage.getItem("pt-sockets") !== "0"; } catch (e) { return true; } };
 document.addEventListener("change", (e) => {
   const box = e.target.closest(".pt-socktog input"); if (!box) return;
-  box.closest(".pt-paperdoll").classList.toggle("nosock", !box.checked);
+  box.closest(".pt-geardoll").querySelector(".pt-paperdoll").classList.toggle("nosock", !box.checked);
   try { localStorage.setItem("pt-sockets", box.checked ? "1" : "0"); } catch (err) { /* private window */ }
 });
 new MutationObserver(() => {
-  document.querySelectorAll(".pt-paperdoll:not([data-sk])").forEach((d) => {
-    d.dataset.sk = "1";
+  document.querySelectorAll(".pt-geardoll:not([data-sk])").forEach((g) => {
+    g.dataset.sk = "1";
     const on = ptSockPref();
-    d.classList.toggle("nosock", !on);
-    const i = d.querySelector(".pt-socktog input"); if (i) i.checked = on;
+    g.querySelector(".pt-paperdoll").classList.toggle("nosock", !on);
+    const i = g.querySelector(".pt-socktog input"); if (i) i.checked = on;
   });
 }).observe(document.body, { childList: true, subtree: true });

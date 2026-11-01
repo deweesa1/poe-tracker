@@ -295,7 +295,7 @@ body, .q-page, .q-layout { color: var(--ex-text);
 @media (max-width: 760px) { .pt-charhead .tiles { grid-template-columns: repeat(2, 130px); row-gap: 10px; } }
 /* snapshot: the inventory as the game draws it, jewels, skills */
 .pt-snaphead { font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--ex-gold-hi); }
-.pt-paperdoll { position: relative; flex: none; padding: 34px 18px 18px; border-radius: 4px;
+.pt-paperdoll { position: relative; flex: none; padding: 18px; border-radius: 4px;
   background: radial-gradient(ellipse at 50% 30%, #2a2a2e 0%, #141416 70%); border: 1px solid #4a4134;
   box-shadow: inset 0 0 0 1px #000, inset 0 0 30px rgba(0,0,0,.6); }
 .pt-paperdoll .grid { display: grid; grid-template-columns: repeat(8, 58px); grid-template-rows: repeat(8, 58px); gap: 6px; }
@@ -330,11 +330,13 @@ body, .q-page, .q-layout { color: var(--ex-text);
   top: calc(50% - var(--bh) / 2 + var(--r) * var(--p) + var(--s) / 2); }
 .pt-paperdoll .set2 { display: none; }
 .pt-paperdoll.alt .set1 { display: none; } .pt-paperdoll.alt .set2 { display: flex; }
-.pt-socktog { position: absolute; top: 6px; right: 18px; display: flex; align-items: center; gap: 5px; cursor: pointer;
+.pt-geardoll { width: max-content; max-width: 100%; }
+.pt-gearhead { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.pt-socktog { margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer;
   font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ex-muted); user-select: none; }
 .pt-socktog input { accent-color: #c9a35a; width: 13px; height: 13px; margin: 0; cursor: pointer; }
 .pt-paperdoll.nosock .sk { display: none; }
-.pt-swap { position: absolute; top: 8px; left: 18px; display: flex; gap: 3px; }
+.pt-swap { display: flex; gap: 3px; }
 .pt-swap button { font: 700 11px 'Cinzel', serif; width: 22px; height: 18px; padding: 0; cursor: pointer; color: #a69b8c;
   background: #1a1612; border: 1px solid #4a4134; border-radius: 2px; }
 .pt-swap button.on { color: #14110f; background: #c9a35a; border-color: #e2c27a; }

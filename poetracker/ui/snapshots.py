@@ -392,7 +392,6 @@ def _build(snap: dict) -> None:
     # ---- gear and its stats on the left; skills on the right, as tall as the left side (scrolls if longer)
     with ui.element("div").classes("pt-buildgrid w-full q-mt-sm"):
         with ui.column().classes("gap-3"):
-            ui.label("Gear").classes("pt-snaphead")
             ui.html(_paperdoll(items), sanitize=False)
             dv, rv, src = defences(items), resistances(items), resistance_sources(items)
             dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower(), "")
@@ -512,7 +511,8 @@ def _paperdoll(items: list[dict]) -> str:
     swap = ('<div class="pt-swap"><button class="on" data-set="1">I</button><button data-set="2">II</button></div>'
             if has_swap else "")
     tog = '<label class="pt-socktog"><input type="checkbox" checked> Sockets</label>'
-    return f'<div class="pt-paperdoll">{swap}{tog}<div class="grid">{html_}</div></div>'
+    return (f'<div class="pt-geardoll"><div class="pt-gearhead"><span class="pt-snaphead">Gear</span>{swap}{tog}</div>'
+            f'<div class="pt-paperdoll"><div class="grid">{html_}</div></div></div>')
 
 
 def _gem_props(g: dict) -> tuple[str, str]:
