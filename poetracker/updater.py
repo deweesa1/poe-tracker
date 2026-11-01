@@ -129,6 +129,7 @@ class Updater:
                             "git": self.installed or bool(shutil.which("git")), "needs_installer": False}
         self._target: str | None = None       # newest commit seen by check()
         self._backoff_until = 0.0              # GitHub asked us to slow down
+        self._target_date: str | None = None
         self.state["connected"] = self.connected()
         self.state["version"] = self.version()
 
@@ -235,6 +236,8 @@ class Updater:
                             cmp = _http(f"https://api.github.com/repos/{self.repo}/compare/{local}...{target}")
                             behind = cmp.get("ahead_by") or behind
                             changes = [c["commit"]["message"].splitlines()[0] for c in reversed(cmp.get("commits") or [])]
+                            if cmp.get("commits"):
+                                self._target_date = cmp["commits"][-1]["commit"]["committer"]["date"]
                         else:
                             changes = [_http(f"https://api.github.com/repos/{self.repo}/commits/{target}")
                                        ["commit"]["message"].splitlines()[0]]
@@ -276,9 +279,19 @@ class Updater:
                 staged: dict[str, bytes] = {}
                 for p in todo:
                     from urllib.parse import quote
-                    # through the API, so a private repository works with a token
-                    data = _http(f"https://api.github.com/repos/{self.repo}/contents/{quote(p)}?ref={target}",
-                                 timeout=60, raw=True)
+                    data = None
+                    if not _TOKEN["value"]:
+                        # a public repository: GitHub's plain file server, which doesn't count against the
+                        # 60-requests-an-hour API limit (each changed file used to cost one request)
+                        try:
+                            data = _http(f"https://raw.githubusercontent.com/{self.repo}/{target}/{quote(p)}",
+                                         timeout=60, raw=True)
+                        except Exception:
+                            data = None
+                    if data is None:
+                        # through the API, so a private repository works with a token
+                        data = _http(f"https://api.github.com/repos/{self.repo}/contents/{quote(p)}?ref={target}",
+                                     timeout=60, raw=True)
                     if blob_sha(data) != remote[p]:
                         return False, f"A downloaded file didn't match GitHub's fingerprint ({p}); nothing was changed."
                     staged[p] = data
@@ -299,10 +312,10 @@ class Updater:
                             pass
                 date = time.strftime("%b %d, %H:%M")
                 try:
-                    c = _http(f"https://api.github.com/repos/{self.repo}/commits/{target}")
+                    iso = (self._target_date if self._target == target else None) or \
+                        _http(f"https://api.github.com/repos/{self.repo}/commits/{target}")["commit"]["committer"]["date"]
                     from datetime import datetime
-                    date = datetime.fromisoformat(c["commit"]["committer"]["date"].replace("Z", "+00:00")).astimezone().strftime(
-                        "%b %d, %H:%M")
+                    date = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%b %d, %H:%M")
                 except Exception:
                     pass
                 (PROJECT_DIR / VERSION_FILE).write_text(json.dumps({"commit": target, "date": date}), encoding="utf-8")
@@ -346,7 +359,8 @@ def _short_error(e: Exception) -> str:
     import urllib.error
     if isinstance(e, urllib.error.HTTPError):
         if e.code == 403:
-            return "GitHub says to slow down; it'll check again in a few minutes"
+            return ("GitHub's hourly limit for update checks is used up (lots of updates in a row); "
+                    "it'll try again in about 10 minutes")
         if e.code in (401, 404):
             return ("GitHub won't show the project (private repository?): add an access token in Settings → Updates"
                     if not _TOKEN["value"] else "GitHub didn't accept the access token")
