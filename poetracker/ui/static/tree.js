@@ -259,18 +259,30 @@ new MutationObserver(() => {
   });
 }).observe(document.body, { childList: true, subtree: true });
 
-// jewels go under whichever build column is shorter (both copies are rendered; one is shown)
+// the build's two columns end flush: the jewels go on the side that leaves the smaller gap,
+// then CSS stretches the shorter side's last block (both jewel copies are rendered; one is shown)
 const ptJewelSide = () => document.querySelectorAll(".pt-buildgrid").forEach((g) => {
   const cols = g.children; if (cols.length < 2) return;
-  const h = (col) => {                 // content height without the jewel block
-    let top = col.getBoundingClientRect().top, bot = top;
+  g.classList.add("pt-meas");          // natural heights, nothing stretched
+  const h = (col) => {
+    const top = col.getBoundingClientRect().top; let bot = top;
     for (const c of col.children) {
       if (c.classList.contains("pt-jb") || !c.offsetParent) continue;
       bot = Math.max(bot, c.getBoundingClientRect().bottom);
     }
     return bot - top;
   };
-  const side = h(cols[1]) + 40 < h(cols[0]) ? "r" : "l";
+  const L = h(cols[0]), R = h(cols[1]);
+  const jb = g.querySelector(".pt-jb-l") || g.querySelector(".pt-jb-r");
+  let side = "n";
+  if (jb) {
+    const vis = [...g.querySelectorAll(".pt-jb-l, .pt-jb-r")].find((x) => x.offsetParent);
+    const J = (vis ? vis.getBoundingClientRect().height : 0) + 12;
+    // on the right only if they fit there whole (their panel stretches to the bottom); otherwise on the
+    // left, and the skill cards spread out to meet them. The gear stats never have to stretch.
+    side = R + J <= L ? "r" : "l";
+  }
+  g.classList.remove("pt-meas");
   if (g.dataset.jw !== side) g.dataset.jw = side;
 });
 let ptJwT = 0;

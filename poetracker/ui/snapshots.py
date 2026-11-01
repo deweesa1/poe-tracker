@@ -456,7 +456,7 @@ def _build(snap: dict) -> None:
     jb = (f'<div class="pt-snaphead">Jewels · {len(jewels) + len(abyss)}</div>'
           f'<div class="pt-jewelrow">{_jewels_html(jewels, abyss)}</div>') if (jewels or abyss) else ""
     with ui.element("div").classes("pt-buildgrid w-full q-mt-sm"):
-        with ui.column().classes("gap-3"):
+        with ui.column().classes("gap-3 pt-buildl"):
             ui.html(_paperdoll(items), sanitize=False)
             dv, rv, src = defences(items), resistances(items), resistance_sources(items)
             dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower(), "")
@@ -485,7 +485,7 @@ def _build(snap: dict) -> None:
             ui.label("Gear Determined Stats").classes("pt-snaphead").tooltip(
                 "Added up from what you're wearing: each item's own defences and mods, before the passive tree, "
                 "the act penalty and other bonuses. Hover a stat to see which items give it.")
-            ui.html(row(dcells) + row(rcells) + row(acells) + row(ucells))
+            ui.html(row(dcells) + row(rcells) + row(acells) + row(ucells)).classes("w-full pt-statbox")
             if jb:
                 ui.html(jb, sanitize=False).classes("w-full pt-jb pt-jb-l")
         with ui.column().classes("gap-3 pt-skillcol"):
