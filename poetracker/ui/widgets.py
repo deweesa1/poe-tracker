@@ -439,6 +439,9 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-def .energy { border-left: 3px solid #4a68a6; } .pt-def .ward { border-left: 3px solid #b9b3a6; }
 .pt-def .fire { border-left: 3px solid #b5502e; } .pt-def .cold { border-left: 3px solid #5a8fc0; }
 .pt-def .lightning { border-left: 3px solid #c9a83a; } .pt-def .chaos { border-left: 3px solid #9a4a8a; }
+.pt-def .life { border-left: 3px solid #c03838; } .pt-def .mana { border-left: 3px solid #3a5ec0; }
+.pt-def .str { border-left: 3px solid #a0503c; } .pt-def .dex { border-left: 3px solid #4f8a48; }
+.pt-def .int { border-left: 3px solid #4a68a6; } .pt-def .util { border-left: 3px solid #8a7046; }
 #pt-atlas-tip b { display: block; font-family: 'Cinzel', serif; color: var(--ex-gold-hi, #e6c27a); font-size: 14px; margin-bottom: 4px; }
 #pt-atlas-tip div { color: #8f8fe0; }
 #pt-atlas-tip i { display: block; margin-top: 6px; color: var(--ex-muted, #a69b8c); font-style: normal; font-size: 12px; }

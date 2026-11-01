@@ -189,11 +189,73 @@ def resistance_sources(items: list[dict]) -> dict:
     return out
 
 
-def _res_tip(res: str, rows: list) -> str:
+_MOD_KEYS = ("implicitMods", "explicitMods", "craftedMods", "fracturedMods", "enchantMods", "mutatedMods",
+             "crucibleMods", "runeMods", "desecratedMods")
+_ATTR = ("Strength", "Dexterity", "Intelligence")
+
+
+def _stat_hits(text: str, it: dict | None = None):
+    """(stat, value) pairs one mod line adds to the extra gear stats."""
+    import re
+    t = text.strip()
+    rules = (
+        (r"([+-]?\d+) to maximum Life", lambda m: [("Life", int(m[1]))]),
+        (r"(\d+)% (increased|reduced) maximum Life", lambda m: [("Life%", int(m[1]) * (1 if m[2] == "increased" else -1))]),
+        (r"([+-]?\d+) to maximum Mana", lambda m: [("Mana", int(m[1]))]),
+        (r"([+-]?\d+) to all Attributes", lambda m: [(a, int(m[1])) for a in _ATTR]),
+        (r"([+-]?\d+) to (Strength|Dexterity|Intelligence) and (Strength|Dexterity|Intelligence)",
+         lambda m: [(m[2], int(m[1])), (m[3], int(m[1]))]),
+        (r"([+-]?\d+) to (Strength|Dexterity|Intelligence)", lambda m: [(m[2], int(m[1]))]),
+        (r"(\d+)% (increased|reduced) Movement Speed", lambda m: [("Movement", int(m[1]) * (1 if m[2] == "increased" else -1))]),
+        (r"\+?(\d+)% chance to Suppress Spell Damage", lambda m: [("Suppression", int(m[1]))]),
+        (r"\+?(\d+)% Chance to Block Attack Damage", lambda m: [("Block", int(m[1]))]),
+        (r"\+?(\d+)% Chance to Block Spell Damage", lambda m: [("Spell block", int(m[1]))]),
+        (r"(\d+)% increased Rarity of Items found", lambda m: [("Rarity", int(m[1]))]),
+    )
+    for pat, fn in rules:
+        m = re.fullmatch(pat, t, re.I)
+        if m:
+            g = [m.group(0)] + [x.capitalize() if x and x.lower() in ("strength", "dexterity", "intelligence") else x
+                                for x in m.groups()]
+            return fn(g)
+    return []
+
+
+GEAR_STATS = ("Life", "Mana", "Strength", "Dexterity", "Intelligence",
+              "Movement", "Suppression", "Block", "Spell block", "Rarity")
+
+
+def gear_stats(items: list[dict]) -> tuple[dict, dict]:
+    """Life, mana, attributes, movement speed, suppression, block and rarity added up from
+    the worn gear's mods (a shield's own block chance counts too). Returns (totals, sources)."""
+    tot: dict = dict.fromkeys(GEAR_STATS + ("Life%",), 0)
+    src: dict = {}
+    for it in items:
+        if it.get("inventoryId") in ("Weapon2", "Offhand2", "Flask", "Trinket"):
+            continue
+        mine: dict = {}
+        for key in _MOD_KEYS:
+            for m in it.get(key) or []:
+                for k, v in _stat_hits(_mod_text(m), it):
+                    mine[k] = mine.get(k, 0) + v
+        for p in it.get("properties") or []:
+            if p.get("name") == "Chance to Block" and p.get("values"):
+                try:
+                    mine["Block"] = mine.get("Block", 0) + int(str(p["values"][0][0]).rstrip("%"))
+                except ValueError:
+                    pass
+        for k, v in mine.items():
+            if v:
+                tot[k] += v
+                src.setdefault(k, []).append((_item_name(it), v))
+    return tot, src
+
+
+def _src_tip(title: str, rows: list, unit: str = "%") -> str:
     if not rows:
         return ""
-    lines = "".join(f'<div class="ic-mod expl">{esc(n)}: <b style="color:#e8e2d4">{v:+d}%</b></div>' for n, v in rows)
-    return (f'<div class="ic"><div class="ic-head normal"><div>{esc(res)} resistance</div></div>'
+    lines = "".join(f'<div class="ic-mod expl">{esc(n)}: <b style="color:#e8e2d4">{v:+d}{unit}</b></div>' for n, v in rows)
+    return (f'<div class="ic"><div class="ic-head normal"><div>{esc(title)}</div></div>'
             f'<div class="ic-body">{lines}</div></div>')
 
 
@@ -396,15 +458,31 @@ def _build(snap: dict) -> None:
             dv, rv, src = defences(items), resistances(items), resistance_sources(items)
             dcells = [(k.replace(" Rating", ""), f"{v:,}" if v else "–", k.split()[0].lower(), "")
                       for k, v in dv.items() if k != "Ward" or v]
-            rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower(), _res_tip(k, src.get(k) or []))
+            rcells = [(f"{k} res", f"{v:+d}%" if v else "–", k.lower(), _src_tip(f"{k} resistance", src.get(k) or []))
                       for k, v in rv.items()]
             row = (lambda cs: f'<div class="pt-def" style="grid-template-columns:repeat({len(cs)}, 1fr)">' + "".join(
                 f'<span class="{c}{" pt-tipable" if t else ""}"{f" data-tip={chr(34)}{esc(t)}{chr(34)}" if t else ""}>'
                 f'<small>{esc(k)}</small>{esc(v)}</span>' for k, v, c, t in cs) + "</div>")
+            gs, gsrc = gear_stats(items)
+
+            def cell(k, label, cls, unit="", pct=False):
+                v = gs[k]
+                txt = (f"{v:+d}%" if pct else f"{v:+,}") if v else "–"
+                if k == "Life" and gs["Life%"]:
+                    txt = (txt if v else "–") + f" · {gs['Life%']:+d}%"
+                tip = _src_tip(label, gsrc.get(k, []), "%" if pct else "")
+                if k == "Life" and gsrc.get("Life%"):
+                    tip = _src_tip("Life", gsrc.get("Life", []), "") + _src_tip("Increased maximum Life", gsrc["Life%"])
+                return (label, txt, cls, tip)
+            acells = [cell("Life", "Life", "life"), cell("Mana", "Mana", "mana"),
+                      cell("Strength", "Str", "str"), cell("Dexterity", "Dex", "dex"), cell("Intelligence", "Int", "int")]
+            ucells = [cell("Movement", "Move speed", "util", pct=True), cell("Suppression", "Suppress", "util", pct=True),
+                      cell("Block", "Block", "util", pct=True), cell("Spell block", "Spell block", "util", pct=True),
+                      cell("Rarity", "Rarity", "util", pct=True)]
             ui.label("Gear Determined Stats").classes("pt-snaphead").tooltip(
-                "Added up from what you're wearing: each item's own defences and resistance mods, before the "
-                "passive tree, the act penalty and other bonuses. Hover a resistance to see where it comes from.")
-            ui.html(row(dcells) + row(rcells))
+                "Added up from what you're wearing: each item's own defences and mods, before the passive tree, "
+                "the act penalty and other bonuses. Hover a stat to see which items give it.")
+            ui.html(row(dcells) + row(rcells) + row(acells) + row(ucells))
         with ui.column().classes("gap-3 pt-skillcol"):
             ui.label("Skills").classes("pt-snaphead")
             sk = _skills(items)
