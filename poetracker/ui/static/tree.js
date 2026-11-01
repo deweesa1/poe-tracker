@@ -258,3 +258,23 @@ new MutationObserver(() => {
     const i = g.querySelector(".pt-socktog input"); if (i) i.checked = on;
   });
 }).observe(document.body, { childList: true, subtree: true });
+
+// jewels go under whichever build column is shorter (both copies are rendered; one is shown)
+const ptJewelSide = () => document.querySelectorAll(".pt-buildgrid").forEach((g) => {
+  const cols = g.children; if (cols.length < 2) return;
+  const h = (col) => {                 // content height without the jewel block
+    let top = col.getBoundingClientRect().top, bot = top;
+    for (const c of col.children) {
+      if (c.classList.contains("pt-jb") || !c.offsetParent) continue;
+      bot = Math.max(bot, c.getBoundingClientRect().bottom);
+    }
+    return bot - top;
+  };
+  const side = h(cols[1]) + 40 < h(cols[0]) ? "r" : "l";
+  if (g.dataset.jw !== side) g.dataset.jw = side;
+});
+let ptJwT = 0;
+const ptJwSoon = () => { clearTimeout(ptJwT); ptJwT = setTimeout(ptJewelSide, 60); };
+new MutationObserver((ms) => { if (ms.some((m) => m.type === "childList")) ptJwSoon(); })
+  .observe(document.body, { childList: true, subtree: true });
+window.addEventListener("resize", ptJwSoon);

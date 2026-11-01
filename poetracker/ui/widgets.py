@@ -351,8 +351,12 @@ body, .q-page, .q-layout { color: var(--ex-text);
 /* skills: one card per link group, gems as a chain of linked sockets */
 .pt-buildgrid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: stretch; }
 .pt-skillcol { min-width: 0; display: flex; flex-direction: column; }
-.pt-skillscroll { flex: 1 1 auto; }
-@media (max-width: 1100px) { .pt-buildgrid { grid-template-columns: 1fr; } }
+.pt-skillscroll { flex: none; }
+.pt-jb { margin-top: 6px; } .pt-jb .pt-snaphead { margin-bottom: 6px; }
+.pt-jb-r, .pt-jb-w { display: none; }
+.pt-buildgrid[data-jw="r"] .pt-jb-l { display: none; } .pt-buildgrid[data-jw="r"] .pt-jb-r { display: block; }
+@media (max-width: 1100px) { .pt-buildgrid { grid-template-columns: 1fr; }
+  .pt-buildgrid .pt-jb-l, .pt-buildgrid .pt-jb-r, .pt-buildgrid[data-jw="r"] .pt-jb-r { display: none; } .pt-jb-w { display: block; } }
 .pt-jewelrow .pt-jewels { display: flex; flex-wrap: wrap; width: auto; max-width: none; }
 .pt-jewelrow { display: flex; flex-wrap: wrap; gap: 4px 28px; }
 .pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 8px; width: 100%; }

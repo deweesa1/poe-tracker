@@ -451,7 +451,10 @@ def _build(snap: dict) -> None:
     items = [i for i in snap["items"].get("items") or [] if i.get("inventoryId") in WORN]
     jewels = (snap.get("passives") or {}).get("items") or []
     abyss = [g for it in items for g in it.get("socketedItems") or [] if g.get("abyssJewel")]
-    # ---- gear and its stats on the left; skills on the right, as tall as the left side (scrolls if longer)
+    # ---- gear and its stats on the left, skills on the right; the jewels go under whichever side is
+    # shorter (tree.js picks; rendered in both places, one shown, so nothing moves between parents)
+    jb = (f'<div class="pt-snaphead">Jewels · {len(jewels) + len(abyss)}</div>'
+          f'<div class="pt-jewelrow">{_jewels_html(jewels, abyss)}</div>') if (jewels or abyss) else ""
     with ui.element("div").classes("pt-buildgrid w-full q-mt-sm"):
         with ui.column().classes("gap-3"):
             ui.html(_paperdoll(items), sanitize=False)
@@ -483,14 +486,17 @@ def _build(snap: dict) -> None:
                 "Added up from what you're wearing: each item's own defences and mods, before the passive tree, "
                 "the act penalty and other bonuses. Hover a stat to see which items give it.")
             ui.html(row(dcells) + row(rcells) + row(acells) + row(ucells))
+            if jb:
+                ui.html(jb, sanitize=False).classes("w-full pt-jb pt-jb-l")
         with ui.column().classes("gap-3 pt-skillcol"):
             ui.label("Skills").classes("pt-snaphead")
             sk = _skills(items)
             ui.html(f'<div class="pt-skills">{sk}</div>' if sk else '<div class="pt-note">No gems.</div>').classes(
                 "w-full pt-skillscroll")
-    if jewels or abyss:                      # full width, so any number of jewels sit in a row or two
-        ui.label(f"Jewels · {len(jewels) + len(abyss)}").classes("pt-snaphead q-mt-md")
-        ui.html(f'<div class="pt-jewelrow">{_jewels_html(jewels, abyss)}</div>').classes("w-full")
+            if jb:
+                ui.html(jb, sanitize=False).classes("w-full pt-jb pt-jb-r")
+    if jb:                                   # narrow windows: full width under both columns
+        ui.html(jb, sanitize=False).classes("w-full pt-jb pt-jb-w")
 
     # ---- the passive tree, with the ascendancy over it like in game
     if not passive_tree.status()["ready"]:
