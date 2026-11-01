@@ -350,30 +350,30 @@ body, .q-page, .q-layout { color: var(--ex-text);
 .pt-jewel img { width: 44px; height: 44px; object-fit: contain; }
 /* skills: one card per link group, gems as a chain of linked sockets */
 .pt-buildgrid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: stretch; }
-.pt-skillcol { min-height: 0; contain: size; overflow: hidden; display: flex; flex-direction: column; }
-.pt-skillscroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
-@media (max-width: 1100px) { .pt-buildgrid { grid-template-columns: 1fr; } .pt-skillcol { contain: none; } }
+.pt-skillcol { min-width: 0; display: flex; flex-direction: column; }
+.pt-skillscroll { flex: 1 1 auto; }
+@media (max-width: 1100px) { .pt-buildgrid { grid-template-columns: 1fr; } }
 .pt-jewelrow .pt-jewels { display: flex; flex-wrap: wrap; width: auto; max-width: none; }
 .pt-jewelrow { display: flex; flex-wrap: wrap; gap: 4px 28px; }
-.pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 10px; width: 100%; }
-.pt-skill { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--ex-line); border-radius: 3px;
+.pt-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 8px; width: 100%; }
+.pt-skill { margin: 0; padding: 7px 12px 8px; border: 1px solid var(--ex-line); border-radius: 3px;
   background: linear-gradient(180deg, rgba(20,18,24,.9), rgba(10,9,12,.9)); }
-.pt-skill .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-width: 0; }
-.pt-skill .hd img { width: 26px; height: 26px; object-fit: contain; }
+.pt-skill .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; min-width: 0; }
+.pt-skill .hd img { width: 22px; height: 22px; object-fit: contain; }
 .pt-skill .sl { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ex-muted); }
 .pt-skill .ln { font-size: 10.5px; font-weight: 700; color: #14110f; background: #c9a35a; border-radius: 2px; padding: 0 5px; }
 .pt-skill .wh { font-size: 13px; color: #6fd3c6; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-skill .chain { display: flex; align-items: flex-start; flex-wrap: nowrap; column-gap: 2px; }
-.pt-skill .chain > i.lk { width: 9px; height: 4px; margin-top: 21px; flex: none; border-radius: 2px;
+.pt-skill .chain > i.lk { width: 9px; height: 4px; margin-top: 18px; flex: none; border-radius: 2px;
   background: linear-gradient(180deg, #3e2f1c, #9a7c4c 50%, #5a4426); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
 .pt-skill .gs { display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 62px; max-width: 92px; cursor: help; }
-.pt-skill .gs b { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+.pt-skill .gs b { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   box-sizing: border-box; border: 2px solid color-mix(in srgb, var(--sc) 85%, #000);
   background:
     radial-gradient(circle at 36% 30%, rgba(255,235,190,.2) 0 4%, transparent 9%),
     radial-gradient(circle, #0a0807 0 47%, #17110b 53%, #2e2216 57%, #8c7046 62%, #6a5232 69%, #3e2f1c 77%, #7a6040 85%, #3a2c1a 92%, #1a130b 100%);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.85), inset 0 0 6px color-mix(in srgb, var(--sc) 25%, transparent); }
-.pt-skill .gs b img { width: 26px; height: 26px; object-fit: contain; }
+.pt-skill .gs b img { width: 23px; height: 23px; object-fit: contain; }
 .pt-skill .gs.sup b { box-shadow: none; }
 .pt-skill .gs.empty b { opacity: .5; box-shadow: none; }
 .pt-skill .gs em { font-style: normal; font-size: 10px; font-weight: 700; color: #e8e2d4; background: rgba(0,0,0,.8);

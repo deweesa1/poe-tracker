@@ -580,11 +580,12 @@ def _skills(items: list[dict]) -> str:
                           f'<span class="gs sup granted pt-tipable" data-n="{esc(nm)}" data-c="#c9a35a" '
                           f'data-s="{esc("Supports every gem socketed in this item")}" data-a="From the item\'s mods">'
                           f'<b><span class="gi">✦</span></b><em>{esc(lvl_)}</em><small>{esc(nm.replace(" Support", ""))}</small></span>')
-            linked = len(idxs)
+            linked = len(idxs) + len(granted)     # item-granted supports count as extra links
+            why = (f' title="{len(idxs)} linked sockets + {len(granted)} from the item\'s mods"' if granted else "")
             what = (", ".join(g.get("typeLine") or "?" for g in actives) or "Supports only")
             cards += (f'<div class="pt-skill"><div class="hd">'
                       + (f'<img src="{esc(it.get("icon") or "")}" alt="" loading="lazy">' if it.get("icon") else "")
-                      + f'<span class="sl">{esc(label)}</span><span class="ln">{linked}-Link</span>'
+                      + f'<span class="sl">{esc(label)}</span><span class="ln"{why}>{linked}-Link</span>'
                       f'<span class="wh">{esc(what)}</span></div><div class="chain">{chain}</div></div>')
     return cards
 

@@ -1197,16 +1197,6 @@ def character_page():
                     {"name": "kind", "label": "Kind", "fmt": lambda v, r: KIND.get(v, v or "")},
                     {"name": "area_level", "label": "Area level", "num": True},
                 ], d["deaths"], page_size=10, empty_text="No deaths. Nice.")
-        with ui.row().classes("w-full gap-4 items-start pt-wrap"):
-            with card("Allocated notables & keystones (known)", "flex-1"):
-                import re
-                table([{"name": "name", "label": "Node"}, {"name": "count", "label": "Count", "num": True}],
-                      [x for x in d["tree"]["by_name"] if not re.match(r"^(Strength|Dexterity|Intelligence|\+\d+ to )", x["name"] or "")],
-                      page_size=10)
-            with card("Masteries", "flex-1"):
-                table([{"name": "name", "label": "Mastery"},
-                       {"name": "since", "label": "Since", "fmt": lambda v, r: fmt.when(v)}],
-                      d["masteries"]["allocated"], page_size=10, empty_text="None logged.")
 
     with body:
         if not chars:
